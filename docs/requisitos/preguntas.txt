@@ -1,0 +1,54 @@
+¿Quién y cómo se realiza el registro y habilitación de usuarios en la plataforma (R01, R02)?
+
+Opción A: Los estudiantes y tutores se autorregistran libremente y pueden operar de inmediato sin validaciones adicionales.
+Opción B: Los estudiantes se autorregistran con aceptación obligatoria de Habeas Data, mientras que los tutores deben someter sus soportes a auditoría y aprobación administrativa para obtener la condición de tutor verificado.
+Opción C: Solo el administrador crea cuentas para estudiantes y tutores de manera centralizada.
+¿Quién gestiona los catálogos académicos y la comisión del servicio (R03)?
+
+Opción A: Administrador del sistema de forma exclusiva.
+Opción B: Los tutores pueden crear dinámicamente cualquier asignatura no listada y definir su propia comisión.
+Opción C: Coordinadores de facultad autorizados por cada universidad vinculada.
+¿Cómo se valida la calidad, la prevención de fraude y la modificación de solicitudes académicas (R04, R05, R06)?
+
+Opción A: El sistema valida campos completos, bloquea descripciones genéricas/vagas ("ayuda con matemáticas"), bloquea solicitudes asociadas a fraude/exámenes en vivo y permite editar o cancelar la solicitud solo antes de la confirmación bilateral.
+Opción B: Se permite texto libre sin validaciones temáticas ni filtros antifraude, y la solicitud puede modificarse en cualquier momento, incluso tras acordar con el tutor.
+Opción C: Las solicitudes son revisadas manualmente por un moderador antes de ser visibles y nunca pueden ser canceladas por el estudiante.
+Sobre el modelo de negociación inDrive y el ciclo de vida del servicio (R08, R09, R10):
+a) ¿Cuántas contrapropuestas activas puede recibir una solicitud publicada y qué ocurre al confirmar una?
+
+Opción A: Múltiples tutores pueden postular ofertas simultáneas (aceptar precio, contraproponer tarifa o proponer duración/modalidad alternativa); al confirmar una de ellas, el acuerdo se congela y las demás ofertas quedan descartadas automáticamente.
+Opción B: Solo un tutor puede ofertar a la vez y la solicitud queda bloqueada para otros tutores hasta que el estudiante responda.
+Opción C: No hay límite de ofertas y el estudiante puede confirmar a múltiples tutores simultáneamente para la misma sesión.
+b) ¿Se pueden renegociar o modificar los términos tras la confirmación bilateral?
+Opción A: Sí, cualquiera de las partes puede modificar el precio o duración en cualquier instante.
+Opción B: No, la confirmación congela inmutablemente el precio y las condiciones acordadas (no permite cambios unilaterales).
+Opción C: Solo el tutor puede aumentar el precio después de iniciar la sesión.
+¿En qué momento se efectúa la retención de comisión y la liberación del pago al tutor (R11, R12)?
+
+Opción A: Se requiere autorización/reserva del método de pago al confirmar el servicio; la comisión de la plataforma se calcula y retiene de forma transparente al momento de la confirmación de finalización por parte del estudiante, liberando el saldo neto al tutor.
+Opción B: El pago se realiza en efectivo directamente entre las partes sin intermediación ni retención de comisión de la plataforma.
+Opción C: El pago total se desembolsa al tutor por adelantado al publicar la solicitud sin retención de comisión.
+¿Existe alguna restricción o regla crítica adicional que deba saber ahora (por ejemplo, resolución de disputas, calificaciones, o restricciones técnicas/arquitectónicas) (R13, R14, R15, R16)?
+
+Si sí: por favor detalla brevemente (lista corta).
+
+Respuestas del equipo técnico (asumidas para redactar historias):
+
+1. Respuesta: Opción B — Los estudiantes se autorregistran aceptando la política de tratamiento de datos personales (Ley Estatutaria 1581 de 2012); los tutores pueden registrarse con perfil declarativo, pero requieren auditoría y validación documental por el Administrador para exhibir la distinción y beneficios de "Tutor Verificado".
+
+2. Respuesta: Opción A — El Administrador del sistema gestiona de manera centralizada los catálogos académicos (universidades, facultades, programas, asignaturas) y define la tasa de comisión global de la plataforma (ej. 10%).
+
+3. Respuesta: Opción A — El sistema impone validaciones de negocio estrictas: bloquea descripciones vacías o genéricas (menores a 20 caracteres informativos o frases como "necesito ayuda con matemáticas"), activa filtros preventivos de rechazo automático ante palabras clave de fraude académico (suplantación, examen en tiempo real, parcial virtual) y restringe la edición o cancelación exclusivamente al estado previo a la confirmación bilateral.
+
+4a. Respuesta: Opción A — Una solicitud publicada puede recibir múltiples ofertas o contrapropuestas concurrentes de diferentes tutores; cuando el estudiante confirma una propuesta, el servicio cambia a "Servicio confirmado" y el resto de propuestas quedan automáticamente cerradas y descartadas.
+4b. Respuesta: Opción B — La confirmación bilateral congela definitivamente el precio acordado, duración y modalidad, prohibiendo cualquier alteración unilateral por cualquiera de las partes.
+
+5. Respuesta: Opción A — Al confirmar el servicio se genera la retención preventiva del valor acordado; una vez el estudiante marca el servicio como finalizado, el sistema calcula de forma transparente la comisión (ej. 10%, equivalente a $4.000 COP sobre $40.000 COP) y transfiere el valor neto ($36.000 COP) al tutor.
+
+6. Restricciones críticas adicionales asumidas:
+- Las calificaciones y reseñas bilaterales están estrictamente condicionadas a solicitudes con estado "Servicio finalizado".
+- Todo reporte o reclamación abierta traslada la solicitud al estado "En revisión por un reporte o una disputa", congelando la liquidación de fondos mientras el equipo de soporte analiza el historial auditable del chat y se otorgan garantías de apelación.
+- La solución se estructura en tres capas desacopladas (Presentación móvil/web, Lógica de aplicación/dominio y Persistencia).
+- La adopción del motor relacional PostgreSQL se formula como propuesta técnica de arquitectura sujeta a ratificación formal, lo cual no bloquea el modelado del dominio de negocio.
+
+Si quieres cambiar alguna de estas respuestas, indícalo y ajusto las historias antes de generar los archivos finales.

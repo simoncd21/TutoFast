@@ -1,0 +1,70 @@
+Caso: UniDrive Tutorías - Plataforma móvil y web de tutorías universitarias bajo un modelo de negociación de precios inspirado en inDrive
+UniDrive Tutorías opera una plataforma digital móvil y web que conecta a estudiantes universitarios que requieren apoyo académico con tutores pares y monitores certificados bajo un modelo dinámico de negociación de precios. El equipo de software recibió los siguientes requisitos y reglas iniciales. Todas las especificaciones de este caso se basan en este enunciado, salvo que se indique lo contrario.
+
+ID
+
+Requisito / regla
+
+R01
+
+UniDrive registra usuarios con roles de Estudiante solicitante, Tutor y Administrador, garantizando la protección de datos personales y sensibles conforme a la Ley Estatutaria 1581 de 2012 (Habeas Data).
+
+R02
+
+El perfil del tutor diferencia explícitamente entre información declarada (áreas de interés, presentación personal) e información verificada con soportes institucionales auditados (por ejemplo, certificados de monitoría académica, historial de calificaciones o carné estudiantil vigente).
+
+R03
+
+El sistema permite al Administrador gestionar los catálogos académicos de universidades, facultades, programas académicos y asignaturas, así como configurar el porcentaje de comisión cobrado por la plataforma.
+
+R04
+
+Un estudiante puede publicar una solicitud académica con los siguientes campos obligatorios: universidad, facultad, programa, asignatura, tema específico, descripción detallada (prohibiendo textos genéricos o vagos como "necesito ayuda con matemáticas"), archivos o fotos adjuntos de los ejercicios o guías, tipo de servicio, fecha y hora sugeridas, modalidad (virtual o presencial en zona segura dentro del campus), duración (30 minutos, 1 hora o 2 horas) y precio inicial propuesto en pesos colombianos (COP).
+
+R05
+
+La edición o cancelación de una solicitud de tutoría está permitida únicamente antes de que exista un acuerdo bilateral confirmado entre el estudiante y un tutor.
+
+R06
+
+El sistema prohíbe de forma expresa y previene solicitudes que impliquen fraude académico, suplantación de identidad en exámenes en tiempo real o realización de evaluaciones individuales calificables asignadas a terceros.
+
+R07
+
+El sistema permite consultar y filtrar solicitudes académicas y perfiles de tutores según criterios de universidad, facultad, programa, asignatura, tema, modalidad, disponibilidad horaria, precio y calificación promedio.
+
+R08
+
+El sistema implementa un modelo de negociación de precios y condiciones inspirado en inDrive, mediante el cual un tutor postulado puede: (1) aceptar directamente el precio ofrecido por el estudiante (ejemplo: $25.000 COP por 1 hora de ecuaciones diferenciales de primer orden), (2) enviar una contrapropuesta económica (ejemplo: $30.000 COP por la misma sesión), o (3) proponer una duración o modalidad alternativa con su respectivo valor (ejemplo: $30.000 COP por 90 minutos con explicación conceptual detallada, o $22.000 COP por 45 minutos en modalidad virtual).
+
+R09
+
+El estudiante puede seleccionar una de las propuestas recibidas para formalizar una confirmación bilateral que congela el precio final y las condiciones pactadas, impidiendo modificaciones unilaterales posteriores.
+
+R10
+
+El sistema gestiona de forma estricta los estados del ciclo de vida del servicio: Solicitud publicada, Propuestas recibidas, Negociación en curso, Tutor seleccionado, Servicio confirmado, Tutoría en desarrollo, Servicio finalizado, Cancelado y En revisión por un reporte o una disputa.
+
+R11
+
+Cada solicitud cuenta con un canal de mensajería interna contextual asociado, el cual permite el intercambio de mensajes y archivos permitidos, el reporte de mensajes indebidos o que violen las políticas de la plataforma, y la conservación inmutable del historial para soporte en caso de controversias.
+
+R12
+
+La finalización de la sesión de tutoría debe ser confirmada por el estudiante solicitante, momento en el cual el sistema realiza el cálculo transparente de la retención de la comisión de la plataforma y el pago neto al tutor (ejemplo: sobre una tutoría de $40.000 COP con un 10% de comisión, la plataforma retiene $4.000 COP y se liberan $36.000 COP a favor del tutor).
+
+R13
+
+El sistema dispone de un esquema de calificaciones y reseñas bilaterales, donde el estudiante califica al tutor en claridad pedagógica, dominio temático, puntualidad, cumplimiento, trato y relación calidad/precio; y el tutor califica al estudiante en puntualidad, comunicación y cumplimiento. Dicha calificación está restringida exclusivamente a servicios registrados y finalizados en la plataforma.
+
+R14
+
+El sistema implementa un mecanismo formal de reportes, reclamaciones y sanciones por inasistencia, cobro no autorizado por fuera de la plataforma, intento de fraude académico, conducta abusiva, acoso o falsedad en credenciales, distinguiendo entre incumplimiento de servicio, conducta abusiva y desacuerdo estrictamente académico, garantizando a las partes el derecho a presentar descargos y apelación.
+
+R15
+
+La dirección técnica determinó que la solución se organizará, a nivel general, bajo una arquitectura en tres capas claramente desacopladas: interfaz de usuario (móvil y web), lógica de aplicación (servicios de dominio y reglas de negocio) y capa de persistencia.
+
+R16
+
+El equipo técnico propone la adopción de PostgreSQL como motor de base de datos relacional para soportar integridad referencial y transacciones ACID, manteniendo esta decisión como propuesta técnica pendiente de confirmación definitiva.
