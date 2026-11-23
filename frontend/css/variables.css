@@ -1,0 +1,75 @@
+/* Tokens de diseño de TutoFast: morado pastel + azul suave. Tema claro por defecto. */
+:root {
+  --color-primario: #8b7cf6;
+  --color-primario-hover: #7566e8;
+  --color-primario-suave: #ece9fe;
+  --color-secundario: #7ab8f5;
+  --color-secundario-suave: #e3f1fd;
+
+  --fondo: #f8f7ff;
+  --superficie: #ffffff;
+  --superficie-2: #f1effd;
+  --borde: #e2defa;
+  --texto: #2b2750;
+  --texto-suave: #6b6890;
+  --texto-sobre-primario: #ffffff;
+
+  --exito: #3fb984;
+  --exito-suave: #dcf5ea;
+  --advertencia: #e9a43a;
+  --advertencia-suave: #fdf0d9;
+  --error: #e5617a;
+  --error-suave: #fde4e9;
+  --info: #5aa6ee;
+  --info-suave: #e3f1fd;
+
+  --sombra-sm: 0 1px 3px rgba(80, 64, 160, 0.10);
+  --sombra-md: 0 6px 20px rgba(80, 64, 160, 0.12);
+  --sombra-lg: 0 16px 40px rgba(80, 64, 160, 0.18);
+
+  --radio-sm: 8px;
+  --radio-md: 14px;
+  --radio-lg: 22px;
+
+  --espacio-1: 0.25rem;
+  --espacio-2: 0.5rem;
+  --espacio-3: 0.75rem;
+  --espacio-4: 1rem;
+  --espacio-5: 1.5rem;
+  --espacio-6: 2rem;
+  --espacio-7: 3rem;
+  --espacio-8: 4.5rem;
+
+  --fuente: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ancho-max: 1120px;
+  --transicion: 0.2s ease;
+}
+
+[data-theme="dark"] {
+  --color-primario: #a99cff;
+  --color-primario-hover: #bdb3ff;
+  --color-primario-suave: #2e2a5a;
+  --color-secundario: #7fbdf7;
+  --color-secundario-suave: #1f3550;
+
+  --fondo: #15132b;
+  --superficie: #1f1c3c;
+  --superficie-2: #28244b;
+  --borde: #38336a;
+  --texto: #ece9ff;
+  --texto-suave: #a9a5d0;
+  --texto-sobre-primario: #1b1740;
+
+  --exito: #5fd0a0;
+  --exito-suave: #17382d;
+  --advertencia: #f0b95a;
+  --advertencia-suave: #3d2f14;
+  --error: #f0839a;
+  --error-suave: #43202b;
+  --info: #7fbdf7;
+  --info-suave: #1f3550;
+
+  --sombra-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --sombra-md: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --sombra-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+}

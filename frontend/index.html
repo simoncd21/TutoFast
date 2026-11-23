@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="TutoFast: tutorías universitarias con precios negociables. Publica lo que necesitas y elige la mejor propuesta.">
+  <title>TutoFast · Tutorías universitarias a tu precio</title>
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/estilos.css">
+  <script>
+    // Aplica el tema guardado antes de pintar para evitar parpadeos.
+    (function () {
+      var t = localStorage.getItem('tutofast_tema');
+      if (t !== 'light' && t !== 'dark') {
+        t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  <header class="navbar">
+    <div class="contenedor navbar__interior">
+      <a class="navbar__marca" href="index.html" aria-label="TutoFast, inicio">
+        <span class="navbar__logo" aria-hidden="true">T</span>
+        <span>TutoFast</span>
+      </a>
+      <nav class="navbar__enlaces" data-menu-enlaces aria-label="Principal">
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#beneficios">Beneficios</a>
+        <a href="#acceso">Empezar</a>
+      </nav>
+      <div class="navbar__acciones">
+        <button class="btn btn--icono" type="button" data-alternar-tema aria-label="Cambiar tema">🌙</button>
+        <button class="btn btn--icono navbar__menu" type="button" data-menu-boton aria-expanded="false" aria-label="Abrir menú">☰</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="contenedor hero__interior">
+        <div>
+          <span class="badge badge--info">Plataforma universitaria de tutorías</span>
+          <h1>Aprende con el tutor ideal, <span>al precio que propones</span></h1>
+          <p class="hero__texto">Publica lo que necesitas y cuánto puedes pagar. Los tutores verificados te envían propuestas, tú comparas, negocias y eliges. Sin sorpresas.</p>
+          <div class="hero__acciones" id="acceso">
+            <button class="btn btn--primario btn--grande" type="button" data-abrir-modal="modal-pronto">Crear cuenta</button>
+            <button class="btn btn--borde btn--grande" type="button" data-demo-toast>Iniciar sesión</button>
+          </div>
+          <p class="estado-api texto-suave" style="margin-top:1.25rem">
+            <span class="punto" id="estado-punto"></span>
+            <span id="estado-texto">Comprobando servidor…</span>
+          </p>
+        </div>
+
+        <aside class="hero__demo" aria-label="Ejemplo de negociación">
+          <div class="tarjeta">
+            <div class="oferta">
+              <div>
+                <span class="badge">Solicitud</span>
+                <p style="margin:.5rem 0 0"><strong>Ecuaciones Diferenciales</strong><br><span class="texto-suave">Estudiante ofrece</span></p>
+              </div>
+              <strong>$25.000</strong>
+            </div>
+          </div>
+          <div class="tarjeta">
+            <div class="oferta">
+              <div>
+                <span class="badge badge--exito">Tutor verificado</span>
+                <p style="margin:.5rem 0 0"><strong>Laura</strong><br><span class="texto-suave">Contrapropuesta · 90 min</span></p>
+              </div>
+              <strong>$30.000</strong>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="seccion" id="como-funciona">
+      <div class="contenedor">
+        <h2 class="centrado">Cómo funciona</h2>
+        <p class="centrado texto-suave">Tres pasos para conseguir ayuda académica.</p>
+        <div class="rejilla rejilla--3 pasos">
+          <article class="tarjeta paso">
+            <h3>Publica tu solicitud</h3>
+            <p class="texto-suave">Cuenta qué materia necesitas, cuándo y cuánto ofreces en pesos colombianos.</p>
+          </article>
+          <article class="tarjeta paso">
+            <h3>Recibe propuestas</h3>
+            <p class="texto-suave">Los tutores aceptan tu oferta o te proponen otro precio y horario. Puedes contraofertar.</p>
+          </article>
+          <article class="tarjeta paso">
+            <h3>Elige y confirma</h3>
+            <p class="texto-suave">Selecciona la mejor propuesta. El pago queda retenido hasta que termine la sesión.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="seccion" id="beneficios" style="background:var(--superficie-2)">
+      <div class="contenedor">
+        <h2 class="centrado">Pensado para la vida universitaria</h2>
+        <div class="rejilla rejilla--4" style="margin-top:2rem">
+          <article class="tarjeta tarjeta--elevable">
+            <div class="tarjeta__icono" aria-hidden="true">💬</div>
+            <h3>Precios negociables</h3>
+            <p class="texto-suave">Tú propones, el tutor responde. Acuerdo justo para ambos.</p>
+          </article>
+          <article class="tarjeta tarjeta--elevable">
+            <div class="tarjeta__icono" aria-hidden="true">✅</div>
+            <h3>Tutores verificados</h3>
+            <p class="texto-suave">Revisamos certificados y priorizamos correos institucionales.</p>
+          </article>
+          <article class="tarjeta tarjeta--elevable">
+            <div class="tarjeta__icono" aria-hidden="true">🔒</div>
+            <h3>Pago protegido</h3>
+            <p class="texto-suave">Los fondos se liberan solo cuando confirmas la tutoría.</p>
+          </article>
+          <article class="tarjeta tarjeta--elevable">
+            <div class="tarjeta__icono" aria-hidden="true">⭐</div>
+            <h3>Reseñas bilaterales</h3>
+            <p class="texto-suave">Estudiantes y tutores se califican para construir confianza.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <div class="contenedor pie__interior">
+      <span>© <span id="anio"></span> TutoFast · Proyecto académico</span>
+      <span>Tutorías universitarias con precios negociables</span>
+    </div>
+  </footer>
+
+  <div class="modal-fondo" id="modal-pronto" role="dialog" aria-modal="true" aria-labelledby="modal-pronto-titulo">
+    <div class="modal">
+      <div class="modal__cabecera">
+        <h2 id="modal-pronto-titulo">¡Muy pronto!</h2>
+        <button class="btn btn--icono" type="button" data-cerrar-modal="modal-pronto" aria-label="Cerrar">×</button>
+      </div>
+      <p>El registro y el inicio de sesión llegan en el siguiente módulo de TutoFast.</p>
+      <div class="modal__pie">
+        <button class="btn btn--primario" type="button" data-cerrar-modal="modal-pronto">Entendido</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/paginas/index.js"></script>
+</body>
+</html>

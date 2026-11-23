@@ -1,0 +1,37 @@
+# Java / Maven
+target/
+*.jar
+*.class
+*.log
+!backend/.mvn/wrapper/maven-wrapper.jar
+
+# Variables de entorno y secretos
+.env
+*.env
+!.env.example
+
+# Herramientas de agentes / Claude
+.agents/
+.claude/settings.local.json
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+.apt_generated/
+.springBeans
+nbproject/
+nbbuild/
+
+# Sistema operativo y temporales
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.bak
+*.swp
+*~
