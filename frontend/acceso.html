@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acceso · TutoFast</title>
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/estilos.css">
+  <script>
+    // Aplica el tema guardado antes de pintar para evitar parpadeos.
+    (function () {
+      var t = localStorage.getItem('tutofast_tema');
+      if (t !== 'light' && t !== 'dark') {
+        t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  <header class="navbar" data-encabezado></header>
+
+  <main class="seccion acceso">
+    <div class="contenedor acceso__interior">
+      <section class="tarjeta acceso__tarjeta" aria-labelledby="acceso-titulo">
+        <h1 id="acceso-titulo" class="acceso__titulo">Bienvenido a TutoFast</h1>
+
+        <div class="pestanas" role="tablist" aria-label="Acceso">
+          <button class="pestana" type="button" role="tab" id="pestana-ingreso" aria-controls="panel-ingreso" aria-selected="true">Iniciar sesión</button>
+          <button class="pestana" type="button" role="tab" id="pestana-registro" aria-controls="panel-registro" aria-selected="false" tabindex="-1">Crear cuenta</button>
+        </div>
+
+        <div id="aviso" class="alerta" role="status" hidden></div>
+
+        <!-- Inicio de sesión -->
+        <form id="panel-ingreso" class="panel" role="tabpanel" aria-labelledby="pestana-ingreso" novalidate>
+          <div class="campo">
+            <label for="ingreso-correo">Correo</label>
+            <input type="email" id="ingreso-correo" name="correo" autocomplete="email" required>
+            <div class="campo__error" data-error-de="correo" hidden></div>
+          </div>
+          <div class="campo">
+            <label for="ingreso-clave">Contraseña</label>
+            <input type="password" id="ingreso-clave" name="clave" autocomplete="current-password" required>
+            <div class="campo__error" data-error-de="clave" hidden></div>
+          </div>
+          <button class="btn btn--primario btn--bloque" type="submit">Iniciar sesión</button>
+        </form>
+
+        <!-- Registro -->
+        <form id="panel-registro" class="panel" role="tabpanel" aria-labelledby="pestana-registro" novalidate hidden>
+          <fieldset class="campo selector-rol">
+            <legend>Quiero registrarme como</legend>
+            <label class="opcion-rol"><input type="radio" name="rol" value="ESTUDIANTE" checked> <span>Estudiante</span></label>
+            <label class="opcion-rol"><input type="radio" name="rol" value="TUTOR"> <span>Tutor</span></label>
+            <p class="campo__ayuda">Más adelante podrás activar el otro rol desde tu perfil.</p>
+          </fieldset>
+
+          <div class="campo">
+            <label for="registro-nombre">Nombre completo</label>
+            <input type="text" id="registro-nombre" name="nombre" autocomplete="name" maxlength="120" required>
+            <div class="campo__error" data-error-de="nombre" hidden></div>
+          </div>
+          <div class="campo">
+            <label for="registro-correo">Correo</label>
+            <input type="email" id="registro-correo" name="correo" autocomplete="email" maxlength="120" required>
+            <div class="campo__ayuda">Con correo institucional (.edu.co) tu verificación tiene prioridad.</div>
+            <div class="campo__error" data-error-de="correo" hidden></div>
+          </div>
+          <div class="campo">
+            <label for="registro-documento">Documento de identidad</label>
+            <input type="text" id="registro-documento" name="documento" inputmode="numeric" autocomplete="off" maxlength="15" required>
+            <div class="campo__ayuda">Solo números, entre 5 y 15 dígitos.</div>
+            <div class="campo__error" data-error-de="documento" hidden></div>
+          </div>
+          <div class="campo">
+            <label for="registro-clave">Contraseña</label>
+            <input type="password" id="registro-clave" name="clave" autocomplete="new-password" maxlength="64" required>
+            <div class="campo__ayuda">Entre 8 y 64 caracteres, con al menos una letra y un número.</div>
+            <div class="campo__error" data-error-de="clave" hidden></div>
+          </div>
+          <div class="campo" id="campo-semestre">
+            <label for="registro-semestre">Semestre actual</label>
+            <input type="number" id="registro-semestre" name="semestre" min="1" max="14" inputmode="numeric">
+            <div class="campo__error" data-error-de="semestre" hidden></div>
+          </div>
+
+          <div class="campo campo--casilla">
+            <label class="casilla">
+              <input type="checkbox" id="registro-acepta" name="aceptaTratamientoDatos" required>
+              <span>Autorizo el tratamiento de mis datos personales conforme a la <strong>Ley 1581 de 2012</strong> y la política de tratamiento de datos de TutoFast.</span>
+            </label>
+            <div class="campo__error" data-error-de="aceptaTratamientoDatos" hidden></div>
+          </div>
+
+          <button class="btn btn--primario btn--bloque" type="submit">Crear cuenta</button>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <footer class="pie">
+    <div class="contenedor pie__interior">
+      <span>© <span id="anio"></span> TutoFast · Proyecto académico</span>
+      <span>Tutorías universitarias con precios negociables</span>
+    </div>
+  </footer>
+
+  <script type="module" src="js/paginas/acceso.js"></script>
+</body>
+</html>

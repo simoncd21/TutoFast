@@ -1,18 +1,15 @@
-// Lógica de la portada: tema, navbar, modal de demostración y estado del servidor.
-import { iniciarTema } from '../componentes/tema.js';
-import { iniciarNavbar } from '../componentes/navbar.js';
-import { iniciarModales, info } from '../componentes/alertas.js';
+// Lógica de la portada: encabezado, accesos según la sesión y estado del servidor.
+import { iniciarEncabezado } from '../componentes/encabezado.js';
 import { api } from '../servicios/api.js';
+import { estaAutenticado } from '../sesion.js';
 
-iniciarTema();
-iniciarNavbar();
-iniciarModales();
+iniciarEncabezado();
 
 document.getElementById('anio').textContent = new Date().getFullYear();
 
-document.querySelector('[data-demo-toast]')?.addEventListener('click', () => {
-  info('Pronto podrás publicar tu primera solicitud en TutoFast.');
-});
+const autenticado = estaAutenticado();
+document.querySelectorAll('[data-solo-invitado]').forEach((el) => { el.hidden = autenticado; });
+document.querySelectorAll('[data-solo-autenticado]').forEach((el) => { el.hidden = !autenticado; });
 
 async function comprobarServidor() {
   const punto = document.getElementById('estado-punto');

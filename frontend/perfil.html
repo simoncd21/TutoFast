@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mi perfil · TutoFast</title>
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/estilos.css">
+  <script>
+    // Aplica el tema guardado antes de pintar para evitar parpadeos.
+    (function () {
+      var t = localStorage.getItem('tutofast_tema');
+      if (t !== 'light' && t !== 'dark') {
+        t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  <header class="navbar" data-encabezado></header>
+
+  <main class="seccion">
+    <div class="contenedor perfil">
+      <h1>Mi perfil</h1>
+      <div id="aviso" class="alerta" role="status" hidden></div>
+      <p id="cargando" class="texto-suave">Cargando tu perfil…</p>
+
+      <div id="contenido" hidden>
+        <section class="tarjeta" aria-labelledby="datos-titulo">
+          <h2 id="datos-titulo">Datos de la cuenta</h2>
+          <dl class="datos">
+            <div><dt>Nombre</dt><dd id="dato-nombre"></dd></div>
+            <div><dt>Correo</dt><dd id="dato-correo"></dd></div>
+            <div><dt>Documento</dt><dd id="dato-documento"></dd></div>
+            <div><dt>Registro</dt><dd id="dato-registro"></dd></div>
+            <div><dt>Estado</dt><dd><span id="dato-estado" class="badge"></span></dd></div>
+            <div><dt>Roles</dt><dd id="dato-roles" class="fila-badges"></dd></div>
+          </dl>
+        </section>
+
+        <div id="secciones" class="perfil__secciones">
+          <section class="tarjeta" id="seccion-ESTUDIANTE" aria-labelledby="estudiante-titulo" hidden>
+            <h2 id="estudiante-titulo">Perfil de estudiante</h2>
+            <form id="form-estudiante" novalidate>
+              <div class="campo">
+                <label for="est-semestre">Semestre actual</label>
+                <input type="number" id="est-semestre" name="semestre" min="1" max="14" inputmode="numeric" required>
+                <div class="campo__error" data-error-de="semestre" hidden></div>
+              </div>
+              <button class="btn btn--primario" type="submit">Guardar perfil de estudiante</button>
+            </form>
+          </section>
+
+          <section class="tarjeta" id="seccion-TUTOR" aria-labelledby="tutor-titulo" hidden>
+            <div class="oferta">
+              <h2 id="tutor-titulo">Perfil de tutor</h2>
+              <span id="tutor-verificacion" class="badge badge--advertencia"></span>
+            </div>
+            <p class="texto-suave">Esta información es declarada por ti. La verificación la realiza un administrador a partir de tus soportes.</p>
+            <form id="form-tutor" novalidate>
+              <div class="campo">
+                <label for="tut-presentacion">Presentación</label>
+                <textarea id="tut-presentacion" name="presentacion" maxlength="1000" required></textarea>
+                <div class="campo__error" data-error-de="presentacion" hidden></div>
+              </div>
+              <div class="rejilla-form">
+                <div class="campo">
+                  <label for="tut-tipo">Tipo de tutor</label>
+                  <select id="tut-tipo" name="tipoTutor" required>
+                    <option value="PAR">Par (estudiante)</option>
+                    <option value="MONITOR_CERTIFICADO">Monitor certificado</option>
+                  </select>
+                  <div class="campo__error" data-error-de="tipoTutor" hidden></div>
+                </div>
+                <div class="campo">
+                  <label for="tut-formacion">Formación</label>
+                  <input type="text" id="tut-formacion" name="formacion" maxlength="200">
+                  <div class="campo__error" data-error-de="formacion" hidden></div>
+                </div>
+              </div>
+              <div class="campo">
+                <label for="tut-experiencia">Experiencia</label>
+                <input type="text" id="tut-experiencia" name="experiencia" maxlength="500">
+                <div class="campo__error" data-error-de="experiencia" hidden></div>
+              </div>
+              <div class="campo">
+                <label for="tut-areas">Áreas de interés</label>
+                <input type="text" id="tut-areas" name="areasDeInteres" placeholder="Cálculo, Física, Programación">
+                <div class="campo__ayuda">Sepáralas con comas (máximo 20).</div>
+                <div class="campo__error" data-error-de="areasDeInteres" hidden></div>
+              </div>
+              <fieldset class="campo">
+                <legend>Modalidades</legend>
+                <label class="casilla"><input type="checkbox" name="modalidades" value="VIRTUAL"> <span>Virtual</span></label>
+                <label class="casilla"><input type="checkbox" name="modalidades" value="PRESENCIAL"> <span>Presencial</span></label>
+                <div class="campo__error" data-error-de="modalidades" hidden></div>
+              </fieldset>
+              <div class="campo">
+                <label for="tut-disponibilidad">Disponibilidad</label>
+                <input type="text" id="tut-disponibilidad" name="disponibilidad" maxlength="200" placeholder="L-J 14:00-18:00">
+                <div class="campo__error" data-error-de="disponibilidad" hidden></div>
+              </div>
+              <div class="campo">
+                <label for="tut-cuenta">Cuenta de cobro</label>
+                <input type="text" id="tut-cuenta" name="cuentaBancariaCobro" maxlength="120" autocomplete="off">
+                <div class="campo__ayuda">Referencia para recibir tus pagos (no ingreses datos de tarjeta).</div>
+                <div class="campo__error" data-error-de="cuentaBancariaCobro" hidden></div>
+              </div>
+              <button class="btn btn--primario" type="submit">Guardar perfil de tutor</button>
+            </form>
+          </section>
+        </div>
+
+        <section class="tarjeta" id="seccion-roles" aria-labelledby="roles-titulo" hidden>
+          <h2 id="roles-titulo">Activar otro rol</h2>
+          <p id="roles-texto" class="texto-suave"></p>
+          <button class="btn btn--secundario" type="button" id="boton-activar-rol"></button>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="pie">
+    <div class="contenedor pie__interior">
+      <span>© <span id="anio"></span> TutoFast · Proyecto académico</span>
+      <span>Tutorías universitarias con precios negociables</span>
+    </div>
+  </footer>
+
+  <script type="module" src="js/paginas/perfil.js"></script>
+</body>
+</html>

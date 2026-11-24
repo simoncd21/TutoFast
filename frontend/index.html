@@ -19,23 +19,7 @@
   </script>
 </head>
 <body>
-  <header class="navbar">
-    <div class="contenedor navbar__interior">
-      <a class="navbar__marca" href="index.html" aria-label="TutoFast, inicio">
-        <span class="navbar__logo" aria-hidden="true">T</span>
-        <span>TutoFast</span>
-      </a>
-      <nav class="navbar__enlaces" data-menu-enlaces aria-label="Principal">
-        <a href="#como-funciona">Cómo funciona</a>
-        <a href="#beneficios">Beneficios</a>
-        <a href="#acceso">Empezar</a>
-      </nav>
-      <div class="navbar__acciones">
-        <button class="btn btn--icono" type="button" data-alternar-tema aria-label="Cambiar tema">🌙</button>
-        <button class="btn btn--icono navbar__menu" type="button" data-menu-boton aria-expanded="false" aria-label="Abrir menú">☰</button>
-      </div>
-    </div>
-  </header>
+  <header class="navbar" data-encabezado></header>
 
   <main>
     <section class="hero">
@@ -45,8 +29,9 @@
           <h1>Aprende con el tutor ideal, <span>al precio que propones</span></h1>
           <p class="hero__texto">Publica lo que necesitas y cuánto puedes pagar. Los tutores verificados te envían propuestas, tú comparas, negocias y eliges. Sin sorpresas.</p>
           <div class="hero__acciones" id="acceso">
-            <button class="btn btn--primario btn--grande" type="button" data-abrir-modal="modal-pronto">Crear cuenta</button>
-            <button class="btn btn--borde btn--grande" type="button" data-demo-toast>Iniciar sesión</button>
+            <a class="btn btn--primario btn--grande" href="acceso.html?modo=registro" data-solo-invitado>Crear cuenta</a>
+            <a class="btn btn--borde btn--grande" href="acceso.html" data-solo-invitado>Iniciar sesión</a>
+            <a class="btn btn--primario btn--grande" href="perfil.html" data-solo-autenticado hidden>Ir a mi perfil</a>
           </div>
           <p class="estado-api texto-suave" style="margin-top:1.25rem">
             <span class="punto" id="estado-punto"></span>
@@ -133,19 +118,6 @@
       <span>Tutorías universitarias con precios negociables</span>
     </div>
   </footer>
-
-  <div class="modal-fondo" id="modal-pronto" role="dialog" aria-modal="true" aria-labelledby="modal-pronto-titulo">
-    <div class="modal">
-      <div class="modal__cabecera">
-        <h2 id="modal-pronto-titulo">¡Muy pronto!</h2>
-        <button class="btn btn--icono" type="button" data-cerrar-modal="modal-pronto" aria-label="Cerrar">×</button>
-      </div>
-      <p>El registro y el inicio de sesión llegan en el siguiente módulo de TutoFast.</p>
-      <div class="modal__pie">
-        <button class="btn btn--primario" type="button" data-cerrar-modal="modal-pronto">Entendido</button>
-      </div>
-    </div>
-  </div>
 
   <script type="module" src="js/paginas/index.js"></script>
 </body>

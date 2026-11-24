@@ -9,7 +9,8 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import com.tutofast.modelo.RegistroAuditoria;
 
-public interface RepositorioRegistroAuditoria extends MongoRepository<RegistroAuditoria, String> {
+public interface RepositorioRegistroAuditoria
+        extends MongoRepository<RegistroAuditoria, String>, RepositorioRegistroAuditoriaPersonalizado {
 
     Page<RegistroAuditoria> findByUsuarioIdOrderByFechaDesc(String usuarioId, Pageable paginacion);
 

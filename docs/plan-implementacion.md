@@ -66,17 +66,18 @@ Grafo de dependencias:
 
 ## Módulo 03 · `feature/03-seguridad-identidad`
 **Depende de:** 02
-- [ ] `seguridad/`: JwtUtil, FiltroAutenticacionJwt, UsuarioAutenticado, RolesPermitidos, InterceptorRoles, SeguridadConfig (BCrypt, registro del filtro, interceptor y *argument resolver*).
-- [ ] `servicio/ServicioAuditoria` (`registrarAccion`, `consultar`).
-- [ ] `servicio/ServicioIdentidad` (`registrarUsuario`, `autenticar`, `autorizarDatos`, `activarRol`, perfiles).
-- [ ] Controladores: AutenticacionControlador, UsuarioControlador (perfil, roles).
-- [ ] Endpoints: `POST /api/auth/registro`, `POST /api/auth/iniciar-sesion`, `GET /api/auth/yo`, `GET /api/usuarios/yo`, `PUT /api/usuarios/yo/perfil-estudiante`, `PUT /api/usuarios/yo/perfil-tutor`, `POST /api/usuarios/yo/roles`.
-- [ ] Seed del administrador (ADMIN_CORREO / ADMIN_CLAVE).
-- [ ] Frontend: `acceso.html` + `js/paginas/acceso.js` (pestañas, casilla Ley 1581), `js/sesion.js`, `js/componentes/encabezado.js` (navegación por rol, selector de rol activo, botón de tema), `perfil.html` base.
+- [x] `seguridad/`: JwtUtil, FiltroAutenticacionJwt, UsuarioAutenticado, RolesPermitidos, InterceptorRoles, SeguridadConfig (BCrypt, registro del filtro, interceptor y *argument resolver*).
+- [x] `servicio/ServicioAuditoria` (`registrarAccion`, `consultar`).
+- [x] `servicio/ServicioIdentidad` (`registrarUsuario`, `autenticar`, `autorizarDatos`, `activarRol`, perfiles).
+- [x] Controladores: AutenticacionControlador, UsuarioControlador (perfil, roles).
+- [x] Endpoints: `POST /api/auth/registro`, `POST /api/auth/iniciar-sesion`, `GET /api/auth/yo`, `GET /api/usuarios/yo`, `PUT /api/usuarios/yo/perfil-estudiante`, `PUT /api/usuarios/yo/perfil-tutor`, `POST /api/usuarios/yo/roles`.
+- [x] Seed del administrador (ADMIN_CORREO / ADMIN_CLAVE).
+- [x] Frontend: `acceso.html` + `js/paginas/acceso.js` (pestañas, casilla Ley 1581), `js/sesion.js`, `js/componentes/encabezado.js` (navegación por rol, selector de rol activo, botón de tema), `perfil.html` base. Además: encabezado compartido en `index.html`, `acceso.html` y `perfil.html`; el registro no pide programa académico hasta que exista el catálogo (módulo 04).
 
 **Pruebas**
-- [ ] `ServicioIdentidadTest`: registro sin consentimiento → 422; correo duplicado → 409; clave guardada como hash.
-- [ ] `JwtUtilTest`: firma, expiración, token manipulado.
+- [x] `ServicioIdentidadTest`: registro sin consentimiento → 422; correo duplicado → 409; clave guardada como hash.
+- [x] `JwtUtilTest`: firma, expiración, token manipulado.
+- [x] `ServicioAuditoriaTest` y `ConsultaAuditoriaTest`: registro, detalle copiado, acción vacía → error, filtros combinables; `ServicioIdentidadTest` verifica la auditoría de registro, consentimiento Ley 1581, sesión, rol y seed (130 pruebas en verde).
 - [ ] Manual: ruta protegida sin token → 401; rol incorrecto → 403; cuenta suspendida → 403.
 - [ ] En la interfaz aparece "Registro exitoso en TutoFast".
 

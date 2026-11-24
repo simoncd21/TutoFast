@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
+import com.tutofast.RepositorioAuditoriaEnMemoria;
 import com.tutofast.RepositorioUsuarioEnMemoria;
 import com.tutofast.dto.InicioSesionDTO;
 import com.tutofast.dto.PerfilEstudianteDTO;
@@ -28,6 +30,7 @@ import com.tutofast.excepcion.ExcepcionNoAutenticado;
 import com.tutofast.modelo.EstadoCuenta;
 import com.tutofast.modelo.Modalidad;
 import com.tutofast.modelo.NivelVerificacion;
+import com.tutofast.modelo.RegistroAuditoria;
 import com.tutofast.modelo.Rol;
 import com.tutofast.modelo.TipoTutor;
 import com.tutofast.modelo.Usuario;
@@ -37,12 +40,18 @@ class ServicioIdentidadTest {
 
     private final Map<String, Usuario> almacen = new LinkedHashMap<>();
     private final BCryptPasswordEncoder codificador = new BCryptPasswordEncoder(4);
+    private final List<RegistroAuditoria> bitacora = new ArrayList<>();
     private ServicioIdentidad servicio;
 
     @BeforeEach
     void preparar() {
         servicio = new ServicioIdentidad(RepositorioUsuarioEnMemoria.crear(almacen), codificador,
-                new JwtUtil("secreto-de-prueba-con-mas-de-32-caracteres-ok", Duration.ofHours(8)));
+                new JwtUtil("secreto-de-prueba-con-mas-de-32-caracteres-ok", Duration.ofHours(8)),
+                new ServicioAuditoria(RepositorioAuditoriaEnMemoria.crear(bitacora)));
+    }
+
+    private List<String> acciones() {
+        return bitacora.stream().map(RegistroAuditoria::getAccion).toList();
     }
 
     private RegistroDTO registro(String correo, String documento, Rol rol, Boolean acepta) {
@@ -212,5 +221,69 @@ class ServicioIdentidadTest {
 
         var sesion = servicio.iniciarSesion(new InicioSesionDTO("admin@tutofast.local", "Cambiame#2026"));
         assertEquals(List.of(Rol.ADMINISTRADOR), sesion.usuario().roles());
+    }
+
+    @Test
+    void auditaRegistroYConsentimientoLey1581SinGuardarLaClave() {
+        var id = servicio.registrarUsuario(registro("a@b.co", "1111111111", Rol.ESTUDIANTE, true)).usuarioId();
+
+        assertEquals(List.of("REGISTRO_USUARIO", "CONSENTIMIENTO_DATOS"), acciones());
+        RegistroAuditoria consentimiento = bitacora.get(1);
+        assertEquals(id, consentimiento.getUsuarioId());
+        assertEquals("Ley 1581 de 2012", consentimiento.getDetalle().get("norma"));
+        assertNotNull(consentimiento.getFecha());
+        bitacora.forEach(r -> assertFalse(r.getDetalle().toString().contains("Segura#2026")));
+    }
+
+    @Test
+    void noAuditaRegistrosRechazados() {
+        assertThrows(ExcepcionNegocio.class,
+                () -> servicio.registrarUsuario(registro("a@b.co", "1098765432", Rol.ESTUDIANTE, false)));
+
+        assertTrue(bitacora.isEmpty());
+    }
+
+    @Test
+    void auditaInicioDeSesionExitosoYFallido() {
+        servicio.registrarUsuario(registro("a@b.co", "1111111111", Rol.ESTUDIANTE, true));
+        bitacora.clear();
+
+        servicio.iniciarSesion(new InicioSesionDTO("a@b.co", "Segura#2026"));
+        assertThrows(ExcepcionNoAutenticado.class,
+                () -> servicio.iniciarSesion(new InicioSesionDTO("a@b.co", "Otra#2026")));
+        assertThrows(ExcepcionNoAutenticado.class,
+                () -> servicio.iniciarSesion(new InicioSesionDTO("nadie@b.co", "Otra#2026")));
+
+        assertEquals(List.of("INICIO_SESION", "INICIO_SESION_FALLIDO"), acciones());
+    }
+
+    @Test
+    void auditaActivacionDeRolYActualizacionDePerfil() {
+        var id = servicio.registrarUsuario(registro("a@b.co", "1111111111", Rol.ESTUDIANTE, true)).usuarioId();
+        bitacora.clear();
+
+        servicio.activarRol(id, Rol.TUTOR);
+        servicio.actualizarPerfilEstudiante(id, new PerfilEstudianteDTO(null, 5));
+
+        assertEquals(List.of("ACTIVAR_ROL", "ACTUALIZAR_PERFIL_ESTUDIANTE"), acciones());
+        assertEquals("TUTOR", bitacora.get(0).getDetalle().get("rol"));
+    }
+
+    @Test
+    void noAuditaUnRolRepetido() {
+        var id = servicio.registrarUsuario(registro("a@b.co", "1111111111", Rol.ESTUDIANTE, true)).usuarioId();
+        bitacora.clear();
+
+        assertThrows(ExcepcionNegocio.class, () -> servicio.activarRol(id, Rol.ESTUDIANTE));
+
+        assertTrue(bitacora.isEmpty());
+    }
+
+    @Test
+    void auditaElSeedDelAdministradorComoAccionDelSistema() {
+        servicio.crearAdministradorSiNoExiste("admin@tutofast.local", "Cambiame#2026");
+
+        assertEquals(List.of("SEED_ADMINISTRADOR"), acciones());
+        assertEquals(null, bitacora.get(0).getUsuarioId());
     }
 }

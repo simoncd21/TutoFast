@@ -114,6 +114,12 @@ Si MongoDB no responde: 503 con `"estado":"DEGRADADO","baseDatos":"DOWN"`. Rende
 - Administrador inicial: si se definen `ADMIN_CORREO` y `ADMIN_CLAVE` y no existe ningún ADMINISTRADOR, `DatosInicialesSeed` lo crea al arrancar.
 - Prueba manual: `docs/pruebas/modulo-02-autenticacion.ps1`.
 
+### 3.2 Auditoría de identidad y cliente web (módulo 03)
+- `ServicioAuditoria.registrarAccion(usuarioId, accion, entidad, detalle)` guarda en `registros_auditoria` (solo inserción; `usuarioId` nulo = acción del sistema) y `consultar(usuarioId, entidad, desde, hasta, paginacion)` devuelve los registros más recientes primero con filtros opcionales combinables. Nunca se guardan claves, tokens ni datos de tarjeta.
+- Acciones registradas por `ServicioIdentidad` (entidad `Usuario`): `REGISTRO_USUARIO`, `CONSENTIMIENTO_DATOS` (detalle `norma: "Ley 1581 de 2012"` y fecha), `INICIO_SESION`, `INICIO_SESION_FALLIDO` (solo si el correo existe), `ACTUALIZAR_PERFIL_ESTUDIANTE`, `ACTUALIZAR_PERFIL_TUTOR`, `ACTIVAR_ROL` y `SEED_ADMINISTRADOR`. Los intentos rechazados por validación o consentimiento no generan registro.
+- El endpoint de lectura (`GET /api/admin/auditoria`) se expone en el módulo de administración.
+- Cliente web: `frontend/js/sesion.js` guarda el token y el usuario en `localStorage` (`tutofast_token`, `tutofast_usuario`, `tutofast_rol_activo`) y recarga el usuario con `GET /api/auth/yo` al abrir páginas privadas; ante 401/403 limpia la sesión y redirige a `acceso.html?siguiente=...`. El rol activo es solo de interfaz: el servidor valida siempre los roles reales del token.
+
 ---
 
 ## 4. Usuarios y perfiles — `UsuarioControlador`

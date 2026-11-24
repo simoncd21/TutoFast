@@ -2,7 +2,9 @@ package com.tutofast.servicio;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -37,18 +39,22 @@ public class ServicioIdentidad {
     public static final String MENSAJE_REGISTRO = "Registro exitoso en TutoFast";
     public static final String MENSAJE_CONSENTIMIENTO =
             "Debe aceptar la política de tratamiento de datos conforme a la Ley 1581 de 2012 para continuar";
+    static final String ENTIDAD_USUARIO = "Usuario";
     static final String MENSAJE_CREDENCIALES = "Correo o contraseña incorrectos";
 
     private final RepositorioUsuario repositorio;
     private final PasswordEncoder codificador;
     private final JwtUtil jwtUtil;
+    private final ServicioAuditoria auditoria;
     /** Hash descartable para que un correo inexistente tarde lo mismo que uno con clave errónea. */
     private final String hashFalso;
 
-    public ServicioIdentidad(RepositorioUsuario repositorio, PasswordEncoder codificador, JwtUtil jwtUtil) {
+    public ServicioIdentidad(RepositorioUsuario repositorio, PasswordEncoder codificador, JwtUtil jwtUtil,
+                             ServicioAuditoria auditoria) {
         this.repositorio = repositorio;
         this.codificador = codificador;
         this.jwtUtil = jwtUtil;
+        this.auditoria = auditoria;
         this.hashFalso = codificador.encode("clave-inexistente-tutofast");
     }
 
@@ -86,6 +92,10 @@ public class ServicioIdentidad {
             usuario.setPerfilTutor(new PerfilTutor());
         }
         Usuario guardado = repositorio.save(usuario);
+        auditoria.registrarAccion(guardado.getId(), "REGISTRO_USUARIO", ENTIDAD_USUARIO,
+                detalle("rol", dto.rol().name(), "correo", correo));
+        auditoria.registrarAccion(guardado.getId(), "CONSENTIMIENTO_DATOS", ENTIDAD_USUARIO,
+                detalle("norma", "Ley 1581 de 2012", "fecha", ahora.toString()));
         return new RegistroRespuestaDTO(MENSAJE_REGISTRO, guardado.getId());
     }
 
@@ -93,10 +103,14 @@ public class ServicioIdentidad {
         Usuario usuario = repositorio.findByCorreo(normalizarCorreo(dto.correo())).orElse(null);
         boolean claveCorrecta = codificador.matches(dto.clave(), usuario != null ? usuario.getClaveHash() : hashFalso);
         if (usuario == null || !claveCorrecta) {
+            if (usuario != null) {
+                auditoria.registrarAccion(usuario.getId(), "INICIO_SESION_FALLIDO", ENTIDAD_USUARIO, null);
+            }
             throw new ExcepcionNoAutenticado(MENSAJE_CREDENCIALES);
         }
         exigirCuentaActiva(usuario);
         JwtUtil.TokenEmitido emitido = jwtUtil.generar(usuario.getId(), usuario.getCorreo());
+        auditoria.registrarAccion(usuario.getId(), "INICIO_SESION", ENTIDAD_USUARIO, null);
         return new SesionDTO(emitido.token(), emitido.expiraEn(), UsuarioMapper.aUsuarioDTO(usuario));
     }
 
@@ -126,7 +140,9 @@ public class ServicioIdentidad {
         perfil.setProgramaId(dto.programaId());
         perfil.setSemestre(dto.semestre());
         usuario.setPerfilEstudiante(perfil);
-        return UsuarioMapper.aPerfilCompletoDTO(repositorio.save(usuario));
+        Usuario guardado = repositorio.save(usuario);
+        auditoria.registrarAccion(usuarioId, "ACTUALIZAR_PERFIL_ESTUDIANTE", ENTIDAD_USUARIO, null);
+        return UsuarioMapper.aPerfilCompletoDTO(guardado);
     }
 
     public PerfilCompletoDTO actualizarPerfilTutor(String usuarioId, PerfilTutorDTO dto) {
@@ -135,7 +151,9 @@ public class ServicioIdentidad {
         PerfilTutor perfil = usuario.getPerfilTutor() != null ? usuario.getPerfilTutor() : new PerfilTutor();
         UsuarioMapper.aplicar(dto, perfil);
         usuario.setPerfilTutor(perfil);
-        return UsuarioMapper.aPerfilCompletoDTO(repositorio.save(usuario));
+        Usuario guardado = repositorio.save(usuario);
+        auditoria.registrarAccion(usuarioId, "ACTUALIZAR_PERFIL_TUTOR", ENTIDAD_USUARIO, null);
+        return UsuarioMapper.aPerfilCompletoDTO(guardado);
     }
 
     /** Añade el rol ESTUDIANTE o TUTOR a una cuenta existente (un usuario puede tener ambos). */
@@ -154,7 +172,9 @@ public class ServicioIdentidad {
         if (rol == Rol.ESTUDIANTE && usuario.getPerfilEstudiante() == null) {
             usuario.setPerfilEstudiante(new PerfilEstudiante());
         }
-        return UsuarioMapper.aUsuarioDTO(repositorio.save(usuario));
+        Usuario guardado = repositorio.save(usuario);
+        auditoria.registrarAccion(usuarioId, "ACTIVAR_ROL", ENTIDAD_USUARIO, detalle("rol", rol.name()));
+        return UsuarioMapper.aUsuarioDTO(guardado);
     }
 
     /** Seed: crea el administrador inicial si todavía no existe ninguno. Devuelve true si lo creó. */
@@ -171,7 +191,8 @@ public class ServicioIdentidad {
         admin.setRoles(new LinkedHashSet<>(java.util.List.of(Rol.ADMINISTRADOR)));
         admin.setFechaAutorizacionDatos(ahora);
         admin.setFechaRegistro(ahora);
-        repositorio.save(admin);
+        Usuario guardado = repositorio.save(admin);
+        auditoria.registrarAccion(null, "SEED_ADMINISTRADOR", ENTIDAD_USUARIO, detalle("usuarioId", guardado.getId()));
         return true;
     }
 
@@ -191,6 +212,14 @@ public class ServicioIdentidad {
             throw new ExcepcionAutorizacion("Su cuenta está " + usuario.getEstadoCuenta().name().toLowerCase(Locale.ROOT)
                     + " y no puede acceder a la plataforma");
         }
+    }
+
+    private static Map<String, Object> detalle(Object... paresClaveValor) {
+        Map<String, Object> mapa = new LinkedHashMap<>();
+        for (int i = 0; i + 1 < paresClaveValor.length; i += 2) {
+            mapa.put(String.valueOf(paresClaveValor[i]), paresClaveValor[i + 1]);
+        }
+        return mapa;
     }
 
     private static String normalizarCorreo(String correo) {

@@ -58,7 +58,9 @@ class AutenticacionControladorTest {
     void preparar() {
         ServicioIdentidad servicio = new ServicioIdentidad(RepositorioUsuarioEnMemoria.crear(almacen),
                 new BCryptPasswordEncoder(4),
-                new JwtUtil("secreto-de-prueba-con-mas-de-32-caracteres-ok", Duration.ofHours(8)));
+                new JwtUtil("secreto-de-prueba-con-mas-de-32-caracteres-ok", Duration.ofHours(8)),
+                new com.tutofast.servicio.ServicioAuditoria(
+                        com.tutofast.RepositorioAuditoriaEnMemoria.crear(new java.util.ArrayList<>())));
 
         MongoTemplate plantilla = mock(MongoTemplate.class);
         MongoDatabase bd = mock(MongoDatabase.class);
