@@ -1,5 +1,7 @@
 package com.tutofast.repositorio;
 
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -11,6 +13,8 @@ public interface RepositorioNotificacion extends MongoRepository<DocumentoNotifi
     Page<DocumentoNotificacion> findByUsuarioIdOrderByFechaDesc(String usuarioId, Pageable paginacion);
 
     Page<DocumentoNotificacion> findByUsuarioIdAndLeidaFalseOrderByFechaDesc(String usuarioId, Pageable paginacion);
+
+    List<DocumentoNotificacion> findByUsuarioIdAndLeidaFalse(String usuarioId);
 
     long countByUsuarioIdAndLeidaFalse(String usuarioId);
 }

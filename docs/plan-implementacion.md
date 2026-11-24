@@ -83,18 +83,26 @@ Grafo de dependencias:
 
 ## Módulo 04 · `feature/04-integracion-archivos-notificaciones`
 **Depende de:** 03
-- [ ] `integracion/puertos/`: IPasarelaPago, INotificador, IAlmacenamiento (`guardar`, `recuperar`, `eliminar`), ResultadoTransaccion, ArchivoRecuperado.
-- [ ] `integracion/adaptadores/`: AdaptadorPasarela (simulador `SIM-uuid`, `tok_rechazar`), AdaptadorNotificaciones (+ DocumentoNotificacion), AdaptadorAlmacenamiento (GridFsTemplate).
-- [ ] `servicio/ServicioArchivos` (`validarFormato`, `validarTamano`, `guardar`, `recuperar`, `eliminar`, control de acceso por contexto, limpieza diaria de huérfanos).
-- [ ] `servicio/ServicioNotificaciones` (`notificar`, `consultar`, `marcarLeida`).
-- [ ] Controladores: ArchivoControlador, NotificacionControlador; soportes en UsuarioControlador.
-- [ ] Endpoints: `GET /api/archivos/{id}`, `GET /api/notificaciones`, `GET /api/notificaciones/conteo-no-leidas`, `PATCH /api/notificaciones/{id}/leida`, `PATCH /api/notificaciones/leer-todas`, `POST|GET /api/usuarios/yo/soportes`.
-- [ ] Frontend: campana con polling cada 30 s en el encabezado; lista de notificaciones y subida de soportes en `perfil.html`; descarga autenticada en `utilidades.js`.
+- [x] `integracion/puertos/`: IPasarelaPago, INotificador, IAlmacenamiento (`guardar`, `recuperar`, `eliminar`), ResultadoTransaccion, ArchivoRecuperado.
+- [x] `integracion/adaptadores/`: AdaptadorPasarela (simulador `SIM-uuid`, `tok_rechazar`), AdaptadorNotificaciones (+ DocumentoNotificacion), AdaptadorAlmacenamiento (GridFsTemplate).
+- [x] `servicio/ServicioArchivos` (`validarFormato`, `validarTamano`, `guardar`, `recuperar`, `eliminar`, control de acceso por contexto, limpieza diaria de huérfanos).
+- [x] `servicio/ServicioNotificaciones` (`notificar`, `consultar`, `marcarLeida`).
+- [x] Controladores: ArchivoControlador, NotificacionControlador; soportes en UsuarioControlador.
+- [x] Endpoints: `GET /api/archivos/{id}`, `GET /api/notificaciones`, `GET /api/notificaciones/conteo-no-leidas`, `PATCH /api/notificaciones/{id}/leida`, `PATCH /api/notificaciones/leer-todas`, `POST|GET /api/usuarios/yo/soportes`.
+- [x] Frontend: campana con polling cada 30 s en el encabezado; lista de notificaciones y subida de soportes en `perfil.html`; descarga autenticada (`descargarArchivo`) en `js/servicios/api.js`; campana en `js/componentes/campana.js`, integrada desde `encabezado.js`.
 
 **Pruebas**
-- [ ] `ServicioArchivosTest`: `.exe` → 415; 11 MB → 413; PDF, PNG, JPG y DOCX aceptados.
-- [ ] `AdaptadorPasarelaTest`: aprobado y rechazado.
+- [x] `ServicioArchivosTest`: `.exe` → 415; 11 MB → 413; PDF, PNG, JPG y DOCX aceptados; firma del contenido; control de acceso; limpieza de huérfanos.
+- [x] `AdaptadorPasarelaTest`: aprobado y rechazado.
 - [ ] Manual: subir un soporte → aparece en `archivos.files`; nivel → EN_REVISION.
+- [x] `ServicioNotificacionesTest`, soportes en `ServicioIdentidadTest` y `ArchivosYNotificacionesControladorTest` (171 pruebas en verde).
+- [x] Interfaz verificada en navegador (Edge headless contra una API simulada) en tema claro, oscuro y móvil.
+- [ ] Manual contra Atlas: notificación llega a la campana en ≤ 30 s.
+
+**Notas de diseño**
+- `ContextoArchivo` (servicio): cada módulo que adjunta archivos debe registrar un bean que diga si referencia un archivo y quién puede descargarlo. Lo usan el control de acceso y la limpieza de huérfanos (24 h de gracia; no borra nada si no hay contextos). Hoy: `ContextoSoportesVerificacion`.
+- La subida de soportes no es transaccional: valida y guarda en GridFS, luego guarda el perfil; si eso falla, elimina el archivo. Máximo 5 soportes en revisión por tutor.
+- Se valida extensión **y** firma del contenido (un `.exe` renombrado a `.pdf` da 415).
 
 ## Módulo 05 · `feature/05-catalogos-comision-admin`
 **Depende de:** 03, 04

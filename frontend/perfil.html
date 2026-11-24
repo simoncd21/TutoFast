@@ -110,7 +110,48 @@
               <button class="btn btn--primario" type="submit">Guardar perfil de tutor</button>
             </form>
           </section>
+
+          <section class="tarjeta" id="seccion-soportes" aria-labelledby="soportes-titulo" hidden>
+            <h2 id="soportes-titulo">Soportes de verificación</h2>
+            <p class="texto-suave">Sube documentos que respalden tu perfil (certificado de monitoría, historial de calificaciones, carné…). Un administrador los revisará y, al aprobarlos, tu perfil quedará como «Tutor Verificado».</p>
+            <form id="form-soporte" novalidate>
+              <div class="rejilla-form">
+                <div class="campo">
+                  <label for="sop-tipo">Tipo de soporte</label>
+                  <select id="sop-tipo" name="tipo" required>
+                    <option value="CERTIFICADO_MONITORIA">Certificado de monitoría</option>
+                    <option value="HISTORIAL_CALIFICACIONES">Historial de calificaciones</option>
+                    <option value="CARNE_ESTUDIANTIL">Carné estudiantil</option>
+                    <option value="OTRO">Otro</option>
+                  </select>
+                  <div class="campo__error" data-error-de="tipo" hidden></div>
+                </div>
+                <div class="campo">
+                  <label for="sop-archivo">Archivo</label>
+                  <input type="file" id="sop-archivo" name="archivo" accept=".pdf,.png,.jpg,.jpeg,.docx" required>
+                  <div class="campo__ayuda">PDF, PNG, JPG o DOCX de hasta 10 MB.</div>
+                  <div class="campo__error" data-error-de="archivo" hidden></div>
+                </div>
+              </div>
+              <button class="btn btn--primario" type="submit">Subir soporte</button>
+            </form>
+            <ul id="lista-soportes" class="soportes" aria-label="Soportes enviados"></ul>
+            <p id="soportes-vacio" class="texto-suave" hidden>Aún no has enviado soportes.</p>
+          </section>
         </div>
+
+        <section class="tarjeta" id="notificaciones" aria-labelledby="notif-titulo">
+          <div class="barra-acciones">
+            <h2 id="notif-titulo">Notificaciones</h2>
+            <div class="fila-badges">
+              <label class="casilla"><input type="checkbox" id="notif-solo-no-leidas"> <span>Solo no leídas</span></label>
+              <button class="btn btn--borde btn--pequeno" type="button" id="notif-leer-todas">Marcar todas como leídas</button>
+            </div>
+          </div>
+          <ul id="lista-notificaciones" class="lista-notificaciones" aria-live="polite"></ul>
+          <p id="notif-vacio" class="texto-suave" hidden>No tienes notificaciones.</p>
+          <button class="btn btn--borde btn--pequeno" type="button" id="notif-mas" hidden>Ver más</button>
+        </section>
 
         <section class="tarjeta" id="seccion-roles" aria-labelledby="roles-titulo" hidden>
           <h2 id="roles-titulo">Activar otro rol</h2>

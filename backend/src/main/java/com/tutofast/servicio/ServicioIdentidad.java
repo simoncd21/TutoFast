@@ -4,11 +4,13 @@ import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.tutofast.dto.InicioSesionDTO;
 import com.tutofast.dto.PerfilCompletoDTO;
@@ -17,6 +19,8 @@ import com.tutofast.dto.PerfilTutorDTO;
 import com.tutofast.dto.RegistroDTO;
 import com.tutofast.dto.RegistroRespuestaDTO;
 import com.tutofast.dto.SesionDTO;
+import com.tutofast.dto.ArchivoDTO;
+import com.tutofast.dto.SoporteDTO;
 import com.tutofast.dto.UsuarioDTO;
 import com.tutofast.excepcion.ExcepcionAutorizacion;
 import com.tutofast.excepcion.ExcepcionNegocio;
@@ -24,9 +28,12 @@ import com.tutofast.excepcion.ExcepcionNoAutenticado;
 import com.tutofast.excepcion.ExcepcionNoEncontrado;
 import com.tutofast.mapper.UsuarioMapper;
 import com.tutofast.modelo.EstadoCuenta;
+import com.tutofast.modelo.NivelVerificacion;
 import com.tutofast.modelo.PerfilEstudiante;
 import com.tutofast.modelo.PerfilTutor;
 import com.tutofast.modelo.Rol;
+import com.tutofast.modelo.SoporteVerificacion;
+import com.tutofast.modelo.TipoSoporte;
 import com.tutofast.modelo.Usuario;
 import com.tutofast.repositorio.RepositorioUsuario;
 import com.tutofast.seguridad.JwtUtil;
@@ -39,6 +46,8 @@ public class ServicioIdentidad {
     public static final String MENSAJE_REGISTRO = "Registro exitoso en TutoFast";
     public static final String MENSAJE_CONSENTIMIENTO =
             "Debe aceptar la política de tratamiento de datos conforme a la Ley 1581 de 2012 para continuar";
+    /** Tope de soportes pendientes de revisión por tutor (evita inundar la cola del administrador). */
+    public static final int MAX_SOPORTES_EN_REVISION = 5;
     static final String ENTIDAD_USUARIO = "Usuario";
     static final String MENSAJE_CREDENCIALES = "Correo o contraseña incorrectos";
 
@@ -46,15 +55,17 @@ public class ServicioIdentidad {
     private final PasswordEncoder codificador;
     private final JwtUtil jwtUtil;
     private final ServicioAuditoria auditoria;
+    private final ServicioArchivos archivos;
     /** Hash descartable para que un correo inexistente tarde lo mismo que uno con clave errónea. */
     private final String hashFalso;
 
     public ServicioIdentidad(RepositorioUsuario repositorio, PasswordEncoder codificador, JwtUtil jwtUtil,
-                             ServicioAuditoria auditoria) {
+                             ServicioAuditoria auditoria, ServicioArchivos archivos) {
         this.repositorio = repositorio;
         this.codificador = codificador;
         this.jwtUtil = jwtUtil;
         this.auditoria = auditoria;
+        this.archivos = archivos;
         this.hashFalso = codificador.encode("clave-inexistente-tutofast");
     }
 
@@ -154,6 +165,51 @@ public class ServicioIdentidad {
         Usuario guardado = repositorio.save(usuario);
         auditoria.registrarAccion(usuarioId, "ACTUALIZAR_PERFIL_TUTOR", ENTIDAD_USUARIO, null);
         return UsuarioMapper.aPerfilCompletoDTO(guardado);
+    }
+
+    /**
+     * Sube un soporte de verificación del tutor. No es transaccional a propósito: primero se valida y se guarda el
+     * archivo en GridFS, luego se registra el soporte en el perfil; si ese guardado falla se elimina el archivo.
+     * El nivel pasa a EN_REVISION salvo que el tutor ya esté VERIFICADO.
+     */
+    public SoporteDTO subirSoporte(String usuarioId, TipoSoporte tipo, MultipartFile archivo) {
+        Usuario usuario = buscar(usuarioId);
+        exigirRol(usuario, Rol.TUTOR);
+        PerfilTutor perfil = usuario.getPerfilTutor() != null ? usuario.getPerfilTutor() : new PerfilTutor();
+        long pendientes = perfil.getSoportes().stream()
+                .filter(x -> x.getEstado() == com.tutofast.modelo.EstadoSoporte.EN_REVISION).count();
+        if (pendientes >= MAX_SOPORTES_EN_REVISION) {
+            throw new ExcepcionNegocio("ESTADO_INVALIDO", "Ya tiene " + MAX_SOPORTES_EN_REVISION
+                    + " soportes en revisión; espere a que un administrador los revise", HttpStatus.CONFLICT);
+        }
+
+        ArchivoDTO guardado = archivos.guardar(archivo);
+        SoporteVerificacion soporte = new SoporteVerificacion(tipo, guardado.archivoId(), guardado.nombre(),
+                Instant.now());
+        try {
+            perfil.getSoportes().add(soporte);
+            if (perfil.getNivelVerificacion() == NivelVerificacion.NO_VERIFICADO) {
+                perfil.setNivelVerificacion(NivelVerificacion.EN_REVISION);
+            }
+            usuario.setPerfilTutor(perfil);
+            repositorio.save(usuario);
+        } catch (RuntimeException e) {
+            archivos.eliminar(guardado.archivoId());
+            throw e;
+        }
+        auditoria.registrarAccion(usuarioId, "SUBIR_SOPORTE", ENTIDAD_USUARIO,
+                detalle("soporteId", soporte.getId(), "tipo", tipo.name()));
+        return UsuarioMapper.aSoporteDTO(soporte);
+    }
+
+    public List<SoporteDTO> listarSoportes(String usuarioId) {
+        Usuario usuario = buscar(usuarioId);
+        exigirRol(usuario, Rol.TUTOR);
+        if (usuario.getPerfilTutor() == null) {
+            return List.of();
+        }
+        return usuario.getPerfilTutor().getSoportes().stream()
+                .map(UsuarioMapper::aSoporteDTO).toList();
     }
 
     /** Añade el rol ESTUDIANTE o TUTOR a una cuenta existente (un usuario puede tener ambos). */

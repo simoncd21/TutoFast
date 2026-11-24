@@ -58,3 +58,31 @@ export const api = {
   patch: (ruta, cuerpo) => solicitar('PATCH', ruta, cuerpo ?? {}),
   eliminar: (ruta) => solicitar('DELETE', ruta),
 };
+
+/**
+ * Descarga autenticada de un archivo (`GET /api/archivos/{id}`): los archivos están protegidos por JWT, así que no se
+ * pueden abrir con un enlace directo. Se pide con la cabecera Bearer y se entrega al navegador como blob.
+ */
+export async function descargarArchivo(archivoId, nombre = 'archivo') {
+  let respuesta;
+  try {
+    respuesta = await fetch(`${URL_API}/api/archivos/${encodeURIComponent(archivoId)}`, {
+      headers: { Authorization: `Bearer ${obtenerToken()}` },
+    });
+  } catch {
+    throw new ErrorApi(0, 'SIN_CONEXION', 'No se pudo conectar con el servidor. Inténtalo de nuevo.');
+  }
+  if (!respuesta.ok) {
+    let datos = null;
+    try { datos = await respuesta.json(); } catch { datos = null; }
+    throw new ErrorApi(respuesta.status, datos?.codigo ?? 'ERROR', datos?.mensaje ?? `Error ${respuesta.status}`);
+  }
+  const url = URL.createObjectURL(await respuesta.blob());
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = nombre;
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}

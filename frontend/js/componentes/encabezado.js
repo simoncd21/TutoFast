@@ -2,6 +2,7 @@
 // Se dibuja dentro de <header class="navbar" data-encabezado>. Todo el texto usa textContent.
 import { iniciarTema } from './tema.js';
 import { iniciarNavbar } from './navbar.js';
+import { construirCampana } from './campana.js';
 import { estaAutenticado, obtenerUsuario, rolActivo, rolesDisponibles, cambiarRolActivo, salir, ETIQUETA_ROL } from '../sesion.js';
 
 // Cada módulo posterior agrega aquí sus páginas por rol.
@@ -73,6 +74,7 @@ function construirAcciones(autenticado) {
   if (autenticado) {
     const selector = construirSelectorRol();
     if (selector) acciones.appendChild(selector);
+    acciones.appendChild(construirCampana());
     const usuario = obtenerUsuario();
     const primerNombre = (usuario?.nombre ?? '').split(' ')[0];
     const chip = elemento('span', 'navbar__usuario', primerNombre);

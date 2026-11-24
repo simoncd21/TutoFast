@@ -1,7 +1,8 @@
 // Perfil: datos de la cuenta, perfiles de estudiante y tutor, y activación del otro rol.
 import { iniciarEncabezado } from '../componentes/encabezado.js';
 import { exito, error as toastError } from '../componentes/alertas.js';
-import { api, ErrorApi } from '../servicios/api.js';
+import { api, ErrorApi, descargarArchivo } from '../servicios/api.js';
+import { crearElementoNotificacion, avisarCambioNotificaciones, EVENTO_NOTIFICACIONES } from '../componentes/campana.js';
 import { exigirSesion, refrescarUsuario, rolActivo, ETIQUETA_ROL } from '../sesion.js';
 
 iniciarEncabezado();
@@ -11,6 +12,22 @@ const aviso = document.getElementById('aviso');
 const formEstudiante = document.getElementById('form-estudiante');
 const formTutor = document.getElementById('form-tutor');
 const botonRol = document.getElementById('boton-activar-rol');
+const formSoporte = document.getElementById('form-soporte');
+const listaSoportes = document.getElementById('lista-soportes');
+const listaNotificaciones = document.getElementById('lista-notificaciones');
+const TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024;
+const EXTENSIONES_PERMITIDAS = ['pdf', 'png', 'jpg', 'jpeg', 'docx'];
+const ETIQUETA_TIPO_SOPORTE = {
+  CERTIFICADO_MONITORIA: 'Certificado de monitoría',
+  HISTORIAL_CALIFICACIONES: 'Historial de calificaciones',
+  CARNE_ESTUDIANTIL: 'Carné estudiantil',
+  OTRO: 'Otro',
+};
+const ESTADO_SOPORTE = {
+  EN_REVISION: { texto: 'En revisión', clase: 'badge--advertencia' },
+  APROBADO: { texto: 'Aprobado', clase: 'badge--exito' },
+  RECHAZADO: { texto: 'Rechazado', clase: 'badge--error' },
+};
 
 // Campos que el formulario no edita todavía (se necesita el catálogo del módulo 04): se conservan tal cual.
 let perfilActual = null;
@@ -135,7 +152,11 @@ function pintar(p) {
     if (tiene && rol === activo) contenedor.prepend(seccion); // el rol activo se muestra primero
   });
   if (p.roles.includes('ESTUDIANTE')) pintarEstudiante(p);
-  if (p.roles.includes('TUTOR')) pintarTutor(p);
+  if (p.roles.includes('TUTOR')) {
+    pintarTutor(p);
+    cargarSoportes();
+  }
+  document.getElementById('seccion-soportes').hidden = !p.roles.includes('TUTOR');
   pintarActivacionRol(p);
 
   document.getElementById('cargando').hidden = true;
@@ -215,12 +236,147 @@ botonRol.addEventListener('click', async () => {
   }
 });
 
+// ---- Soportes de verificación (tutor) ----
+function pintarSoportes(soportes) {
+  document.getElementById('soportes-vacio').hidden = soportes.length > 0;
+  listaSoportes.replaceChildren(...soportes.map((s) => {
+    const estado = ESTADO_SOPORTE[s.estado] ?? { texto: s.estado, clase: '' };
+    const item = document.createElement('li');
+    item.className = 'soporte';
+
+    const cabecera = document.createElement('div');
+    cabecera.className = 'soporte__cabecera';
+    const nombre = document.createElement('span');
+    nombre.className = 'soporte__nombre';
+    nombre.textContent = s.nombreArchivo ?? 'Archivo';
+    const badge = document.createElement('span');
+    badge.className = `badge ${estado.clase}`;
+    badge.textContent = estado.texto;
+    cabecera.append(nombre, badge);
+
+    const meta = document.createElement('div');
+    meta.className = 'soporte__meta';
+    meta.textContent = `${ETIQUETA_TIPO_SOPORTE[s.tipo] ?? s.tipo} · enviado el ${formatearFecha(s.fechaEnvio)}`;
+    item.append(cabecera, meta);
+
+    if (s.observacion) {
+      const obs = document.createElement('div');
+      obs.className = 'soporte__observacion';
+      obs.textContent = `Observación del administrador: ${s.observacion}`;
+      item.appendChild(obs);
+    }
+
+    const descargar = document.createElement('button');
+    descargar.type = 'button';
+    descargar.className = 'btn btn--borde btn--pequeno';
+    descargar.textContent = 'Descargar';
+    descargar.setAttribute('aria-label', `Descargar ${s.nombreArchivo ?? 'archivo'}`);
+    descargar.addEventListener('click', async () => {
+      descargar.disabled = true;
+      try {
+        await descargarArchivo(s.archivoId, s.nombreArchivo ?? 'soporte');
+      } catch (err) {
+        toastError(err.message ?? 'No se pudo descargar el archivo');
+      } finally {
+        descargar.disabled = false;
+      }
+    });
+    item.appendChild(descargar);
+    return item;
+  }));
+}
+
+async function cargarSoportes() {
+  try {
+    pintarSoportes(await api.get('/api/usuarios/yo/soportes'));
+  } catch (err) {
+    toastError(err.message ?? 'No se pudieron cargar tus soportes');
+  }
+}
+
+formSoporte.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  limpiarErrores(formSoporte);
+  const archivo = formSoporte.elements.archivo.files[0];
+  if (!archivo) {
+    marcarError(formSoporte, 'archivo', 'Selecciona un archivo');
+    formSoporte.elements.archivo.focus();
+    return;
+  }
+  const extension = archivo.name.split('.').pop().toLowerCase();
+  if (!EXTENSIONES_PERMITIDAS.includes(extension)) {
+    marcarError(formSoporte, 'archivo', 'Formato no permitido: usa PDF, PNG, JPG o DOCX');
+    formSoporte.elements.archivo.focus();
+    return;
+  }
+  if (archivo.size > TAMANO_MAXIMO_BYTES) {
+    marcarError(formSoporte, 'archivo', 'El archivo supera el máximo de 10 MB');
+    formSoporte.elements.archivo.focus();
+    return;
+  }
+  const datos = new FormData();
+  datos.append('datos', new Blob([JSON.stringify({ tipo: formSoporte.elements.tipo.value })], { type: 'application/json' }));
+  datos.append('archivo', archivo);
+  const boton = e.submitter ?? formSoporte.querySelector('button[type="submit"]');
+  const texto = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = 'Subiendo…';
+  try {
+    await api.post('/api/usuarios/yo/soportes', datos);
+    formSoporte.reset();
+    exito('Soporte enviado: quedó en revisión');
+    pintar(await api.get('/api/usuarios/yo')); // actualiza el nivel de verificación y la lista
+  } catch (err) {
+    erroresServidor(formSoporte, err);
+  } finally {
+    boton.disabled = false;
+    boton.textContent = texto;
+  }
+});
+
+// ---- Notificaciones ----
+const TAMANO_PAGINA_NOTIFICACIONES = 20;
+let paginaNotificaciones = 0;
+
+async function cargarNotificaciones(reiniciar = true) {
+  if (reiniciar) paginaNotificaciones = 0;
+  const soloNoLeidas = document.getElementById('notif-solo-no-leidas').checked;
+  try {
+    const datos = await api.get(`/api/notificaciones?soloNoLeidas=${soloNoLeidas}`
+      + `&pagina=${paginaNotificaciones}&tamano=${TAMANO_PAGINA_NOTIFICACIONES}`);
+    const items = datos.contenido.map((n) => crearElementoNotificacion(n));
+    if (reiniciar) listaNotificaciones.replaceChildren(...items);
+    else listaNotificaciones.append(...items);
+    document.getElementById('notif-vacio').hidden = listaNotificaciones.children.length > 0;
+    document.getElementById('notif-mas').hidden = datos.pagina + 1 >= datos.totalPaginas;
+  } catch (err) {
+    toastError(err.message ?? 'No se pudieron cargar las notificaciones');
+  }
+}
+
+document.getElementById('notif-solo-no-leidas').addEventListener('change', () => cargarNotificaciones());
+document.getElementById('notif-mas').addEventListener('click', () => {
+  paginaNotificaciones += 1;
+  cargarNotificaciones(false);
+});
+document.getElementById('notif-leer-todas').addEventListener('click', async () => {
+  try {
+    await api.patch('/api/notificaciones/leer-todas');
+    avisarCambioNotificaciones();
+  } catch (err) {
+    toastError(err.message ?? 'No se pudieron marcar las notificaciones');
+  }
+});
+// La campana del encabezado también dispara este evento al marcar notificaciones.
+window.addEventListener(EVENTO_NOTIFICACIONES, () => cargarNotificaciones());
+
 // ---- Carga inicial ----
 (async function iniciar() {
   try {
     const usuario = await exigirSesion();
     if (!usuario) return;
     pintar(await api.get('/api/usuarios/yo'));
+    cargarNotificaciones();
   } catch (err) {
     document.getElementById('cargando').hidden = true;
     mostrarAviso(err.message ?? 'No se pudo cargar tu perfil. Inténtalo de nuevo.', 'error');

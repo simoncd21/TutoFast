@@ -18,6 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
+import com.tutofast.AlmacenamientoEnMemoria;
+import com.tutofast.ArchivosDePrueba;
 import com.tutofast.RepositorioAuditoriaEnMemoria;
 import com.tutofast.RepositorioUsuarioEnMemoria;
 import com.tutofast.dto.InicioSesionDTO;
@@ -28,12 +30,15 @@ import com.tutofast.excepcion.ExcepcionAutorizacion;
 import com.tutofast.excepcion.ExcepcionNegocio;
 import com.tutofast.excepcion.ExcepcionNoAutenticado;
 import com.tutofast.modelo.EstadoCuenta;
+import com.tutofast.modelo.EstadoSoporte;
+import com.tutofast.modelo.TipoSoporte;
 import com.tutofast.modelo.Modalidad;
 import com.tutofast.modelo.NivelVerificacion;
 import com.tutofast.modelo.RegistroAuditoria;
 import com.tutofast.modelo.Rol;
 import com.tutofast.modelo.TipoTutor;
 import com.tutofast.modelo.Usuario;
+import com.tutofast.repositorio.RepositorioUsuario;
 import com.tutofast.seguridad.JwtUtil;
 
 class ServicioIdentidadTest {
@@ -41,13 +46,17 @@ class ServicioIdentidadTest {
     private final Map<String, Usuario> almacen = new LinkedHashMap<>();
     private final BCryptPasswordEncoder codificador = new BCryptPasswordEncoder(4);
     private final List<RegistroAuditoria> bitacora = new ArrayList<>();
+    private final AlmacenamientoEnMemoria almacenamiento = new AlmacenamientoEnMemoria();
+    private RepositorioUsuario repoUsuarios;
     private ServicioIdentidad servicio;
 
     @BeforeEach
     void preparar() {
-        servicio = new ServicioIdentidad(RepositorioUsuarioEnMemoria.crear(almacen), codificador,
+        repoUsuarios = RepositorioUsuarioEnMemoria.crear(almacen);
+        servicio = new ServicioIdentidad(repoUsuarios, codificador,
                 new JwtUtil("secreto-de-prueba-con-mas-de-32-caracteres-ok", Duration.ofHours(8)),
-                new ServicioAuditoria(RepositorioAuditoriaEnMemoria.crear(bitacora)));
+                new ServicioAuditoria(RepositorioAuditoriaEnMemoria.crear(bitacora)),
+                new ServicioArchivos(almacenamiento, List.of(new ContextoSoportesVerificacion(repoUsuarios))));
     }
 
     private List<String> acciones() {
@@ -285,5 +294,100 @@ class ServicioIdentidadTest {
 
         assertEquals(List.of("SEED_ADMINISTRADOR"), acciones());
         assertEquals(null, bitacora.get(0).getUsuarioId());
+    }
+
+    // ---- soportes de verificación (módulo 04) ----
+
+    private String registrarTutor() {
+        return servicio.registrarUsuario(registro("tutor@u.edu.co", "1012345678", Rol.TUTOR, true)).usuarioId();
+    }
+
+    @Test
+    void subirSoporteGuardaElArchivoYPasaElNivelAEnRevision() {
+        String id = registrarTutor();
+
+        var soporte = servicio.subirSoporte(id, TipoSoporte.CERTIFICADO_MONITORIA, ArchivosDePrueba.pdf());
+
+        assertEquals(EstadoSoporte.EN_REVISION, soporte.estado());
+        assertEquals("certificado.pdf", soporte.nombreArchivo());
+        assertTrue(almacenamiento.contiene(soporte.archivoId()));
+        var perfil = almacen.get(id).getPerfilTutor();
+        assertEquals(NivelVerificacion.EN_REVISION, perfil.getNivelVerificacion());
+        assertEquals(1, perfil.getSoportes().size());
+        assertEquals(soporte.archivoId(), perfil.getSoportes().get(0).getRutaArchivo());
+        assertTrue(acciones().contains("SUBIR_SOPORTE"));
+    }
+
+    @Test
+    void subirSoporteNoDegradaAUnTutorVerificado() {
+        String id = registrarTutor();
+        almacen.get(id).getPerfilTutor().setNivelVerificacion(NivelVerificacion.VERIFICADO);
+
+        servicio.subirSoporte(id, TipoSoporte.OTRO, ArchivosDePrueba.png());
+
+        assertEquals(NivelVerificacion.VERIFICADO, almacen.get(id).getPerfilTutor().getNivelVerificacion());
+    }
+
+    @Test
+    void subirSoporteInvalidoNoGuardaNadaNiCambiaElNivel() {
+        String id = registrarTutor();
+
+        var e = assertThrows(ExcepcionNegocio.class, () -> servicio.subirSoporte(id, TipoSoporte.OTRO,
+                ArchivosDePrueba.archivo("a.exe", "application/octet-stream", new byte[] {1, 2, 3})));
+
+        assertEquals(HttpStatus.UNSUPPORTED_MEDIA_TYPE, e.getEstado());
+        assertEquals(0, almacenamiento.cantidad());
+        assertEquals(NivelVerificacion.NO_VERIFICADO, almacen.get(id).getPerfilTutor().getNivelVerificacion());
+        assertTrue(almacen.get(id).getPerfilTutor().getSoportes().isEmpty());
+    }
+
+    @Test
+    void soloUnTutorPuedeSubirSoportes() {
+        String id = servicio.registrarUsuario(registro("e@u.co", "1111111111", Rol.ESTUDIANTE, true)).usuarioId();
+
+        assertThrows(ExcepcionAutorizacion.class,
+                () -> servicio.subirSoporte(id, TipoSoporte.OTRO, ArchivosDePrueba.pdf()));
+        assertThrows(ExcepcionAutorizacion.class, () -> servicio.listarSoportes(id));
+        assertEquals(0, almacenamiento.cantidad());
+    }
+
+    @Test
+    void limitaLosSoportesPendientesDeRevision() {
+        String id = registrarTutor();
+        for (int i = 0; i < ServicioIdentidad.MAX_SOPORTES_EN_REVISION; i++) {
+            servicio.subirSoporte(id, TipoSoporte.OTRO, ArchivosDePrueba.pdf());
+        }
+
+        var e = assertThrows(ExcepcionNegocio.class,
+                () -> servicio.subirSoporte(id, TipoSoporte.OTRO, ArchivosDePrueba.pdf()));
+
+        assertEquals(HttpStatus.CONFLICT, e.getEstado());
+        assertEquals(ServicioIdentidad.MAX_SOPORTES_EN_REVISION, almacenamiento.cantidad());
+    }
+
+    @Test
+    void siFallaElGuardadoDelPerfilSeEliminaElArchivoSubido() {
+        String id = registrarTutor();
+        org.mockito.Mockito.when(repoUsuarios.save(org.mockito.ArgumentMatchers.any(Usuario.class)))
+                .thenThrow(new IllegalStateException("Mongo caído"));
+
+        assertThrows(IllegalStateException.class,
+                () -> servicio.subirSoporte(id, TipoSoporte.OTRO, ArchivosDePrueba.pdf()));
+
+        assertEquals(0, almacenamiento.cantidad());
+    }
+
+    @Test
+    void listaLosSoportesDelTutor() {
+        String id = registrarTutor();
+        assertTrue(servicio.listarSoportes(id).isEmpty());
+        servicio.subirSoporte(id, TipoSoporte.CARNE_ESTUDIANTIL, ArchivosDePrueba.jpg());
+        servicio.subirSoporte(id, TipoSoporte.HISTORIAL_CALIFICACIONES, ArchivosDePrueba.docx());
+
+        var lista = servicio.listarSoportes(id);
+
+        assertEquals(2, lista.size());
+        assertEquals(TipoSoporte.CARNE_ESTUDIANTIL, lista.get(0).tipo());
+        assertEquals("historial.docx", lista.get(1).nombreArchivo());
     }
 }

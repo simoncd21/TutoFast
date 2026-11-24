@@ -13,6 +13,7 @@ public class SoporteVerificacion {
     private String id = UUID.randomUUID().toString();
     private TipoSoporte tipo;
     private String rutaArchivo;
+    private String nombreArchivo;
     private EstadoSoporte estado = EstadoSoporte.EN_REVISION;
     private Instant fechaEnvio;
     private Instant fechaRevision;
@@ -26,6 +27,11 @@ public class SoporteVerificacion {
         this.tipo = tipo;
         this.rutaArchivo = rutaArchivo;
         this.fechaEnvio = fechaEnvio;
+    }
+
+    public SoporteVerificacion(TipoSoporte tipo, String rutaArchivo, String nombreArchivo, Instant fechaEnvio) {
+        this(tipo, rutaArchivo, fechaEnvio);
+        this.nombreArchivo = nombreArchivo;
     }
 
     public void aprobar(String administradorId, String observacion, Instant ahora) {
@@ -52,6 +58,8 @@ public class SoporteVerificacion {
     public void setTipo(TipoSoporte tipo) { this.tipo = tipo; }
     public String getRutaArchivo() { return rutaArchivo; }
     public void setRutaArchivo(String rutaArchivo) { this.rutaArchivo = rutaArchivo; }
+    public String getNombreArchivo() { return nombreArchivo; }
+    public void setNombreArchivo(String nombreArchivo) { this.nombreArchivo = nombreArchivo; }
     public EstadoSoporte getEstado() { return estado; }
     public void setEstado(EstadoSoporte estado) { this.estado = estado; }
     public Instant getFechaEnvio() { return fechaEnvio; }

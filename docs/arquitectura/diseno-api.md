@@ -151,6 +151,8 @@ Si MongoDB no responde: 503 con `"estado":"DEGRADADO","baseDatos":"DOWN"`. Rende
 
 `SoporteDTO`: `{"id","tipo","archivoId","nombreArchivo","estado","fechaEnvio","fechaRevision","observacion"}`.
 
+`POST /api/usuarios/yo/soportes`: la parte `datos` debe enviarse con `Content-Type: application/json`. Errores: 415 (formato o firma no permitidos), 413 (> 10 MB), 400 (archivo vacío o `tipo` inválido), 409 (ya hay 5 soportes en revisión). Si el nivel era `NO_VERIFICADO` pasa a `EN_REVISION`; un tutor `VERIFICADO` conserva su nivel.
+
 `ResenaDTO`: `{"tipo":"AL_TUTOR","autorNombre","comentario","promedio":4.83,"criterios":{...},"fechaEmision"}`.
 
 ---
@@ -332,7 +334,7 @@ Hilo = `(solicitudId, tutorId)`. Participantes: el estudiante dueño y ese tutor
 ## 12. Archivos — `ArchivoControlador`
 
 ### `GET /api/archivos/{id}` · A (con control de acceso por contexto)
-200 binario con `Content-Type` original y `Content-Disposition: attachment; filename="..."`. 403 si el usuario no tiene acceso al contexto; 404 si no existe. El frontend lo descarga con `fetch` (cabecera Bearer) y luego `URL.createObjectURL(blob)`.
+200 binario con `Content-Type` original y `Content-Disposition: attachment; filename="..."`. 403 si el usuario no tiene acceso al contexto; 404 si no existe. El frontend lo descarga con `fetch` (cabecera Bearer) y luego `URL.createObjectURL(blob)` (`descargarArchivo` en `js/servicios/api.js`). Responde además `X-Content-Type-Options: nosniff` y el tipo MIME se fija según el formato validado. Acceso: un archivo solo se entrega si algún contexto lo referencia (hoy: soportes de verificación → su dueño o un ADMINISTRADOR); un archivo sin referencia da 404.
 
 ---
 
@@ -389,8 +391,10 @@ Las reseñas públicas se consultan en `GET /api/usuarios/{id}/resenas` (secció
 |---|---|---|
 | `GET /api/notificaciones?soloNoLeidas=false` + paginación | A | 200 `Pagina<NotificacionDTO>` |
 | `GET /api/notificaciones/conteo-no-leidas` | A | 200 `{"noLeidas":3}` (la campana lo consulta cada 30 s) |
-| `PATCH /api/notificaciones/{id}/leida` | A (destinatario) | 204 |
+| `PATCH /api/notificaciones/{id}/leida` | A (destinatario) | 204; 404 si no existe o es de otro usuario |
 | `PATCH /api/notificaciones/leer-todas` | A | 204 |
+
+Parámetros de `GET /api/notificaciones`: `soloNoLeidas` (false), `pagina` (0), `tamano` (20, máximo 100).
 
 `NotificacionDTO`: `{"id","tipo","titulo","mensaje","enlace","leida","fecha"}`. Tipos: `NUEVA_PROPUESTA`, `CONTRAOFERTA`, `PROPUESTA_DESCARTADA`, `SERVICIO_CONFIRMADO`, `NUEVO_MENSAJE`, `RECORDATORIO_SESION`, `SERVICIO_FINALIZADO`, `PAGO_LIBERADO`, `CALIFICACION_PENDIENTE`, `REPORTE_RECIBIDO`, `REPORTE_RESUELTO`, `SANCION_APLICADA`, `APELACION_RESUELTA`, `SOPORTE_APROBADO`, `SOPORTE_RECHAZADO`.
 

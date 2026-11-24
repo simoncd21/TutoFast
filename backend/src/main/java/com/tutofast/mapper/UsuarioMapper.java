@@ -7,10 +7,12 @@ import com.tutofast.dto.PerfilCompletoDTO;
 import com.tutofast.dto.PerfilEstudianteDTO;
 import com.tutofast.dto.PerfilTutorDTO;
 import com.tutofast.dto.PerfilTutorVistaDTO;
+import com.tutofast.dto.SoporteDTO;
 import com.tutofast.dto.UsuarioDTO;
 import com.tutofast.modelo.NivelVerificacion;
 import com.tutofast.modelo.PerfilEstudiante;
 import com.tutofast.modelo.PerfilTutor;
+import com.tutofast.modelo.SoporteVerificacion;
 import com.tutofast.modelo.Usuario;
 
 /** Conversiones Usuario ↔ DTO. */
@@ -41,6 +43,11 @@ public final class UsuarioMapper {
                 p.getTipoTutor(), p.getExperiencia(), p.getModalidades(), p.getDisponibilidad(),
                 p.getAsignaturasDominadasIds(), p.getCuentaBancariaCobro(), p.getNivelVerificacion(),
                 etiqueta(p.getNivelVerificacion()), p.getServiciosCompletados());
+    }
+
+    public static SoporteDTO aSoporteDTO(SoporteVerificacion s) {
+        return new SoporteDTO(s.getId(), s.getTipo(), s.getRutaArchivo(), s.getNombreArchivo(), s.getEstado(),
+                s.getFechaEnvio(), s.getFechaRevision(), s.getObservacion());
     }
 
     /** Copia los datos declarados del DTO al perfil; no toca la verificación. */
