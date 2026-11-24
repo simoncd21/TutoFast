@@ -40,6 +40,11 @@ public class ManejadorGlobalExcepciones {
         return respuesta(HttpStatus.NOT_FOUND, "NO_ENCONTRADO", "Recurso no encontrado");
     }
 
+    @ExceptionHandler(ExcepcionNoAutenticado.class)
+    public ResponseEntity<ErrorDTO> noAutenticado(ExcepcionNoAutenticado e) {
+        return respuesta(HttpStatus.UNAUTHORIZED, "NO_AUTENTICADO", e.getMessage());
+    }
+
     @ExceptionHandler(ExcepcionAutorizacion.class)
     public ResponseEntity<ErrorDTO> autorizacion(ExcepcionAutorizacion e) {
         return respuesta(HttpStatus.FORBIDDEN, "NO_AUTORIZADO", e.getMessage());

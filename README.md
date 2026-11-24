@@ -26,6 +26,7 @@ Copia `backend/.env.example` como referencia y define las variables en tu termin
 |---|---|---|
 | `MONGODB_URI` | Sí | Cadena `mongodb+srv://...` de Atlas (con la base `tutofast`) o `mongodb://localhost:27017/tutofast` |
 | `JWT_SECRET` | Sí | Secreto de firma (≥ 32 caracteres) |
+| `ADMIN_CORREO` / `ADMIN_CLAVE` | No | Si ambas están definidas y no existe ningún administrador, se crea uno al arrancar |
 | `FRONTEND_URL` | No | Origen permitido por CORS (por defecto `http://localhost:5500`) |
 | `PORT` | No | Puerto HTTP (por defecto `8080`) |
 | `MONGO_TRANSACCIONES` | No | `true` en Atlas/Render; `false` (por defecto) con Mongo local sin replica set |

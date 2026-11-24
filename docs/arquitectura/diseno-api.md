@@ -106,6 +106,14 @@ Si MongoDB no responde: 503 con `"estado":"DEGRADADO","baseDatos":"DOWN"`. Rende
 ### `GET /api/auth/yo` · A
 200: `UsuarioDTO` (mismo formato que `usuario` en el inicio de sesión).
 
+### 3.1 Notas de implementación (módulo de autenticación)
+- El correo se normaliza a minúsculas y se recorta antes de guardarlo y de buscarlo.
+- Validación del registro (400 `VALIDACION`): `documento` de 5 a 15 dígitos; `clave` de 8 a 64 caracteres con letra y número; `semestre` de 1 a 14; `programaId` (opcional) de 24 caracteres hexadecimales.
+- El token JWT (HS256, firmado con `JWT_SECRET`, vigencia `JWT_EXPIRACION_HORAS`, 8 h por defecto) solo lleva el id del usuario. En cada petición protegida `FiltroAutenticacionJwt` recarga al usuario: los roles y el estado de cuenta siempre son los vigentes, y una cuenta SUSPENDIDA o BLOQUEADA recibe 403 aunque su token no haya expirado.
+- Rutas públicas: `/api/salud`, `/api/auth/registro` y `/api/auth/iniciar-sesion`. Cualquier otra ruta `/api/**` exige `Authorization: Bearer <token>` (401 `NO_AUTENTICADO` si falta o es inválido). Los roles se exigen con `@RolesPermitidos` (403 `NO_AUTORIZADO`).
+- Administrador inicial: si se definen `ADMIN_CORREO` y `ADMIN_CLAVE` y no existe ningún ADMINISTRADOR, `DatosInicialesSeed` lo crea al arrancar.
+- Prueba manual: `docs/pruebas/modulo-02-autenticacion.ps1`.
+
 ---
 
 ## 4. Usuarios y perfiles — `UsuarioControlador`
