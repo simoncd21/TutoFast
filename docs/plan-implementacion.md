@@ -128,29 +128,46 @@ Grafo de dependencias:
 **Depende de:** 04, 05
 - [x] `servicio/ServicioSolicitudes` (`publicarSolicitud`, `editarSolicitud`, `cancelarSolicitud`, `buscarSolicitudes`, `validarIntegridad` con listas configurables de frases genéricas y palabras de fraude).
 - [x] Orden en la publicación: validar → subir a GridFS → persistir (compensar si falla).
-- [ ] `ServicioIdentidad.buscarTutores`. *(pendiente: fuera del alcance de la primera entrega del módulo; se retomará junto con la búsqueda de tutores)*
-- [x] `SolicitudControlador`. [ ] `TutorControlador` *(pendiente, ver arriba)*.
+- [x] `ServicioIdentidad.buscarTutores` (+ `obtenerPerfilPublicoTutor` y `listarResenas`), con `RepositorioUsuarioPersonalizado.buscarTutores` y `FiltroTutores`. *(entregado junto con el Módulo 07)*
+- [x] `SolicitudControlador`. [x] `TutorControlador`.
 - [x] Endpoints de solicitudes: `POST/GET /api/solicitudes`, `GET /api/solicitudes/mias`, `GET/PUT /api/solicitudes/{id}`, `POST /api/solicitudes/{id}/cancelar`, `POST /api/solicitudes/{id}/archivos`.
-- [ ] Endpoints pendientes: `GET /api/tutores`, `GET /api/tutores/{id}`, `GET /api/usuarios/{id}/resenas`.
+- [x] `GET /api/tutores` (filtros programa, asignatura, modalidad, disponibilidad, calificación mínima, solo verificados, orden), `GET /api/tutores/{id}` (perfil público sin cuenta bancaria, documento ni correo) y `GET /api/usuarios/{id}/resenas` (solo reseñas visibles).
 - [x] Frontend: `solicitudes.html` (explorar con filtros, publicar/editar, mis solicitudes con cancelación, detalle con adjuntos) y enlace en `encabezado.js`.
-- [ ] Pendiente: buscar tutores y perfil público en `perfil.html?id=`.
+- [x] `tutores.html` + `js/paginas/tutores.js`: búsqueda con filtros y paginación, y perfil público con reseñas en un modal (`tutores.html?id=` lo abre directamente). Sustituye al `perfil.html?id=` previsto; enlace «Tutores» en el encabezado de ESTUDIANTE y ADMINISTRADOR.
 - [x] `ContextoSolicitudes`: los adjuntos de una solicitud los ve su dueño, un administrador y, mientras está abierta, los tutores.
 
 **Pruebas**
 - [x] `ServicioSolicitudesTest` (31 casos) y `SolicitudControladorTest`: "necesito ayuda con matemáticas" → 422; "resolver examen parcial en vivo" → 422 `FRAUDE_ACADEMICO` + auditoría; duración 90 → 400; cancelar después de FORMALIZADA → 409.
 - [x] Búsqueda sin resultados → mensaje vacío en la interfaz.
+- [x] `ServicioIdentidadTutoresTest` (filtros y expansión del programa, calificación mínima inválida → 400, perfil público sin datos privados, cuentas suspendidas → 404, reseñas), `TutorControladorTest` (401 sin sesión, parámetros inválidos 400, perfil público sin cuenta bancaria/documento/correo) y `ConsultaTutoresTest` (Criteria sin MongoDB).
 
-## Módulo 07 · `feature/07-negociacion-confirmacion`
+## Módulo 07 · `feature/07-propuestas-negociacion`
 **Depende de:** 06
-- [ ] `servicio/ServicioNegociacion` (`enviarPropuesta`, `modificar`, `retirar`, `contraofertar`, `seleccionarPropuesta`, `confirmarServicio` @Transactional, `iniciarSesion`).
-- [ ] `servicio/ServicioPagos` (`retenerFondos`, `calcularLiquidacion`).
-- [ ] Controlador: NegociacionControlador.
-- [ ] Endpoints: `POST/GET /api/solicitudes/{id}/propuestas`, `PUT /api/propuestas/{id}`, `POST /api/propuestas/{id}/retirar|contraofertar|seleccionar`, `POST /api/solicitudes/{id}/confirmar`, `GET /api/servicios/mios`, `GET /api/servicios/{id}`, `PATCH /api/servicios/{id}/enlace`, `POST /api/servicios/{id}/iniciar`.
-- [ ] `ProgramadorTareasConfig`: inicio automático CONFIRMADO → EN_DESARROLLO.
-- [ ] Frontend: `negociacion.html` (comparativa de propuestas, formulario del tutor con los 3 tipos, contraoferta, modal "Autorizar pago simulado y confirmar", ficha del servicio).
 
-**Pruebas**
-- [ ] `ServicioNegociacionTest`: segunda propuesta activa del mismo tutor → 409; propuesta sobre solicitud FORMALIZADA → 409; confirmar descarta las demás y congela `comisionPct`; `tok_rechazar` → 422 sin cambios de estado; tutor dueño de la solicitud → 403.
+El módulo se entrega en dos partes: **(A) propuestas y negociación**, hecha en esta rama, y **(B) confirmación, pago simulado y ciclo del servicio**, pendiente (ver al final).
+
+### Parte A · Propuestas y negociación
+- [x] `servicio/ServicioPropuestas`: `enviarPropuesta`, `modificarPropuesta` (también responde a una contraoferta), `retirarPropuesta`, `contraofertar`, `aceptarPropuesta` (selección provisional), `rechazarPropuesta`, `descartarPropuesta` / `descartarPropuestasDeSolicitud` (uso interno, para la confirmación), `listarPropuestas` y `listarMisPropuestas`.
+- [x] Controlador: `PropuestaControlador` (sin lógica de negocio).
+- [x] Endpoints: `POST/GET /api/solicitudes/{id}/propuestas`, `GET /api/propuestas/mias`, `PUT /api/propuestas/{id}`, `POST /api/propuestas/{id}/retirar|contraofertar|seleccionar|rechazar`.
+- [x] Reglas: una propuesta activa por tutor y solicitud (comprobación previa + traducción de `DuplicateKeyException` del índice `uk_propuesta_activa` → 409 `DUPLICADO`); el tutor no puede proponer a su propia solicitud (403); la solicitud debe estar abierta (409); monto > 0 y ≤ 5.000.000 COP; `ACEPTA_PRECIO` copia las condiciones de la solicitud; `CONTRAPROPUESTA_PRECIO` exige un precio distinto; `ALTERNATIVA_CONDICIONES` exige cambiar duración o modalidad; no se selecciona una propuesta con contraoferta pendiente.
+- [x] Notificaciones: `NUEVA_PROPUESTA`, `CONTRAOFERTA`, `PROPUESTA_ACEPTADA` (tipo nuevo) y `PROPUESTA_DESCARTADA`; un fallo al notificar no revierte la operación. Auditoría: `PROPUESTA_ENVIADA|MODIFICADA|RETIRADA|CONTRAOFERTADA|ACEPTADA|RECHAZADA|DESCARTADA` (la contraoferta guarda el precio anterior).
+- [x] El `ManejadorGlobalExcepciones` responde 400 (en lugar de 500) cuando un parámetro de ruta o de consulta no se puede convertir (por ejemplo, una modalidad inexistente).
+- [x] Frontend: `js/componentes/propuestas.js` dentro del detalle de `solicitudes.html` (el estudiante dueño compara las propuestas por precio, contraoferta, selecciona o rechaza; el tutor propone con los 3 tipos, modifica/responde a la contraoferta y retira), pestaña «Mis propuestas» para el TUTOR y apertura directa con `solicitudes.html?id=` (enlace de las notificaciones). Estilos con variables de tema (claro y oscuro) en `css/estilos.css`.
+
+**Pruebas (parte A)**
+- [x] `ServicioPropuestasTest` (29 casos): segunda propuesta activa del mismo tutor → 409; propuesta sobre solicitud TUTOR_SELECCIONADO / FORMALIZADA / CANCELADA → 409; el dueño no puede proponer; montos inválidos; contraoferta con auditoría del precio anterior; respuesta del tutor con `PUT`; selección bloqueada con contraoferta pendiente; descarte masivo conservando la elegida; compensación si falla el guardado de la solicitud; listados por rol.
+- [x] `PropuestaControladorTest`: flujo completo envío → contraoferta → respuesta → selección, 401/403 por rol y por recurso, 400 de validación, 404 y 409.
+- [ ] Manual contra Atlas (con dos navegadores): el tutor propone, el estudiante contraoferta y la notificación llega a la campana en ≤ 30 s; revisar el aspecto en tema claro y oscuro.
+
+### Parte B · Confirmación y ciclo del servicio *(pendiente)*
+- [ ] `servicio/ServicioNegociacion` (`confirmarServicio` @Transactional, `iniciarSesion`; usará `ServicioPropuestas.descartarPropuestasDeSolicitud`).
+- [ ] `servicio/ServicioPagos` (`retenerFondos`, `calcularLiquidacion`).
+- [ ] Controlador: `NegociacionControlador`.
+- [ ] Endpoints: `POST /api/solicitudes/{id}/confirmar`, `GET /api/servicios/mios`, `GET /api/servicios/{id}`, `PATCH /api/servicios/{id}/enlace`, `POST /api/servicios/{id}/iniciar`.
+- [ ] `ProgramadorTareasConfig`: inicio automático CONFIRMADO → EN_DESARROLLO.
+- [ ] Frontend: `negociacion.html` (modal "Autorizar pago simulado y confirmar", ficha del servicio).
+- [ ] `ServicioNegociacionTest`: confirmar descarta las demás propuestas y congela `comisionPct`; `tok_rechazar` → 422 sin cambios de estado.
 
 ## Módulo 08 · `feature/08-mensajeria-chat`
 **Depende de:** 07, 04

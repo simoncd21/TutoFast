@@ -1,5 +1,6 @@
 package com.tutofast.servicio;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -17,6 +18,9 @@ import org.springframework.web.multipart.MultipartFile;
 import com.tutofast.dto.InicioSesionDTO;
 import com.tutofast.dto.PerfilCompletoDTO;
 import com.tutofast.dto.PerfilEstudianteDTO;
+import com.tutofast.dto.PerfilPublicoTutorDTO;
+import com.tutofast.dto.ResenaDTO;
+import com.tutofast.dto.TutorResumenDTO;
 import com.tutofast.dto.PerfilTutorDTO;
 import com.tutofast.dto.RegistroDTO;
 import com.tutofast.dto.RegistroRespuestaDTO;
@@ -35,7 +39,11 @@ import com.tutofast.excepcion.ExcepcionNegocio;
 import com.tutofast.excepcion.ExcepcionNoAutenticado;
 import com.tutofast.excepcion.ExcepcionNoEncontrado;
 import com.tutofast.mapper.UsuarioMapper;
+import com.tutofast.mapper.CalificacionMapper;
+import com.tutofast.modelo.Asignatura;
+import com.tutofast.modelo.Calificacion;
 import com.tutofast.modelo.EstadoCuenta;
+import com.tutofast.modelo.Modalidad;
 import com.tutofast.modelo.NivelVerificacion;
 import com.tutofast.modelo.PerfilEstudiante;
 import com.tutofast.modelo.PerfilTutor;
@@ -43,6 +51,9 @@ import com.tutofast.modelo.Rol;
 import com.tutofast.modelo.SoporteVerificacion;
 import com.tutofast.modelo.TipoSoporte;
 import com.tutofast.modelo.Usuario;
+import com.tutofast.repositorio.FiltroTutores;
+import com.tutofast.repositorio.RepositorioAsignatura;
+import com.tutofast.repositorio.RepositorioCalificacion;
 import com.tutofast.repositorio.RepositorioUsuario;
 import com.tutofast.seguridad.JwtUtil;
 import com.tutofast.seguridad.UsuarioAutenticado;
@@ -56,6 +67,7 @@ public class ServicioIdentidad {
             "Debe aceptar la política de tratamiento de datos conforme a la Ley 1581 de 2012 para continuar";
     /** Tope de soportes pendientes de revisión por tutor (evita inundar la cola del administrador). */
     public static final int MAX_SOPORTES_EN_REVISION = 5;
+    public static final int TAMANO_PAGINA_TUTORES = 12;
     /** Los correos que terminan así tienen prioridad en la cola de verificación. */
     public static final String SUFIJO_CORREO_INSTITUCIONAL = ".edu.co";
     static final String ENTIDAD_USUARIO = "Usuario";
@@ -67,18 +79,23 @@ public class ServicioIdentidad {
     private final ServicioAuditoria auditoria;
     private final ServicioArchivos archivos;
     private final ServicioNotificaciones notificaciones;
+    private final RepositorioAsignatura asignaturas;
+    private final RepositorioCalificacion calificaciones;
     /** Hash descartable para que un correo inexistente tarde lo mismo que uno con clave errónea. */
     private final String hashFalso;
 
     public ServicioIdentidad(RepositorioUsuario repositorio, PasswordEncoder codificador, JwtUtil jwtUtil,
                              ServicioAuditoria auditoria, ServicioArchivos archivos,
-                             ServicioNotificaciones notificaciones) {
+                             ServicioNotificaciones notificaciones, RepositorioAsignatura asignaturas,
+                             RepositorioCalificacion calificaciones) {
         this.repositorio = repositorio;
         this.codificador = codificador;
         this.jwtUtil = jwtUtil;
         this.auditoria = auditoria;
         this.archivos = archivos;
         this.notificaciones = notificaciones;
+        this.asignaturas = asignaturas;
+        this.calificaciones = calificaciones;
         this.hashFalso = codificador.encode("clave-inexistente-tutofast");
     }
 
@@ -283,6 +300,57 @@ public class ServicioIdentidad {
                     "Tu soporte de verificación fue rechazado: " + texto, "perfil.html");
         }
         return UsuarioMapper.aSoporteDTO(soporte);
+    }
+
+    // ---- Búsqueda pública de tutores ----
+
+    /**
+     * Busca tutores activos. {@code asignaturaId} tiene prioridad sobre {@code programaId} (que se expande a las
+     * asignaturas del programa). Orden: {@code calificacion} (por defecto) o {@code servicios}.
+     */
+    public Pagina<TutorResumenDTO> buscarTutores(String programaId, String asignaturaId, Modalidad modalidad,
+                                                 String disponibilidad, BigDecimal calificacionMin,
+                                                 boolean soloVerificados, String orden, int pagina, int tamano) {
+        if (calificacionMin != null && (calificacionMin.signum() < 0 || calificacionMin.compareTo(BigDecimal.valueOf(5)) > 0)) {
+            throw new ExcepcionNegocio("VALIDACION", "La calificación mínima debe estar entre 0 y 5", HttpStatus.BAD_REQUEST);
+        }
+        List<String> asignaturaIds = null;
+        if (asignaturaId != null && !asignaturaId.isBlank()) {
+            asignaturaIds = List.of(asignaturaId);
+        } else if (programaId != null && !programaId.isBlank()) {
+            asignaturaIds = asignaturas.findByProgramaIdOrderByNombreAsc(programaId).stream()
+                    .map(Asignatura::getId).toList();
+        }
+        FiltroTutores filtro = new FiltroTutores(asignaturaIds, modalidad, disponibilidad, calificacionMin,
+                soloVerificados, FiltroTutores.Orden.deTexto(orden));
+        PageRequest paginacion = PageRequest.of(Math.max(pagina, 0),
+                Math.min(Math.max(tamano <= 0 ? TAMANO_PAGINA_TUTORES : tamano, 1), 50));
+        return Pagina.de(repositorio.buscarTutores(filtro, paginacion), UsuarioMapper::aTutorResumenDTO);
+    }
+
+    /** Perfil público de un tutor activo (sin datos privados) con sus reseñas visibles. */
+    public PerfilPublicoTutorDTO obtenerPerfilPublicoTutor(String tutorId) {
+        Usuario tutor = repositorio.findById(tutorId)
+                .filter(u -> u.tieneRol(Rol.TUTOR) && u.getPerfilTutor() != null && u.estaActiva())
+                .orElseThrow(() -> new ExcepcionNoEncontrado("Tutor no encontrado"));
+        List<String> nombres = new java.util.ArrayList<>();
+        asignaturas.findAllById(tutor.getPerfilTutor().getAsignaturasDominadasIds())
+                .forEach(a -> nombres.add(a.getNombre()));
+        return UsuarioMapper.aPerfilPublicoDTO(tutor, nombres, listarResenas(tutorId));
+    }
+
+    /** Reseñas visibles recibidas por un usuario (más recientes primero). */
+    public List<ResenaDTO> listarResenas(String usuarioId) {
+        if (!repositorio.existsById(usuarioId)) {
+            throw new ExcepcionNoEncontrado("Usuario no encontrado");
+        }
+        List<Calificacion> visibles = calificaciones.findByDestinatarioIdAndVisibleTrueOrderByFechaEmisionDesc(usuarioId);
+        Map<String, String> autores = new LinkedHashMap<>();
+        repositorio.findAllById(visibles.stream().map(Calificacion::getAutorId).distinct().toList())
+                .forEach(u -> autores.put(u.getId(), u.getNombre()));
+        return visibles.stream()
+                .map(c -> CalificacionMapper.aResenaDTO(c, autores.getOrDefault(c.getAutorId(), "Usuario")))
+                .toList();
     }
 
     /** Listado paginado de usuarios con filtros opcionales por rol, estado y texto (nombre o correo). */

@@ -89,7 +89,8 @@ class ArchivosYNotificacionesControladorTest {
         identidad = new ServicioIdentidad(repoUsuarios, new BCryptPasswordEncoder(4),
                 new JwtUtil("secreto-de-prueba-con-mas-de-32-caracteres-ok", Duration.ofHours(8)),
                 com.tutofast.RepositorioAuditoriaEnMemoria.servicio(new ArrayList<>()), archivos,
-                servicioNot);
+                servicioNot, mock(com.tutofast.repositorio.RepositorioAsignatura.class),
+                mock(com.tutofast.repositorio.RepositorioCalificacion.class));
 
 
         mvc = MockMvcBuilders

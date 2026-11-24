@@ -31,6 +31,7 @@
           <button class="pestana" type="button" role="tab" id="pestana-explorar" aria-controls="panel-explorar" aria-selected="true">Explorar</button>
           <button class="pestana" type="button" role="tab" id="pestana-publicar" aria-controls="panel-publicar" aria-selected="false" tabindex="-1" hidden>Publicar</button>
           <button class="pestana" type="button" role="tab" id="pestana-mias" aria-controls="panel-mias" aria-selected="false" tabindex="-1" hidden>Mis solicitudes</button>
+          <button class="pestana" type="button" role="tab" id="pestana-propuestas" aria-controls="panel-propuestas" aria-selected="false" tabindex="-1" hidden>Mis propuestas</button>
         </div>
 
         <!-- Explorar -->
@@ -206,6 +207,12 @@
         <section id="panel-mias" class="admin__panel" role="tabpanel" aria-labelledby="pestana-mias" hidden>
           <div id="mias-lista" class="rejilla rejilla--3" aria-live="polite"></div>
           <p id="mias-vacio" class="texto-suave centrado" hidden>Aún no has publicado solicitudes.</p>
+        </section>
+
+        <!-- Mis propuestas (tutor) -->
+        <section id="panel-propuestas" class="admin__panel" role="tabpanel" aria-labelledby="pestana-propuestas" hidden>
+          <div id="propuestas-lista" class="rejilla rejilla--3" aria-live="polite"></div>
+          <p id="propuestas-vacio" class="texto-suave centrado" hidden>Aún no has enviado propuestas. Explora las solicitudes abiertas y propón.</p>
         </section>
       </div>
     </div>

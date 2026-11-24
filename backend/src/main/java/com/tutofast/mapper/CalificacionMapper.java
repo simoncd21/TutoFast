@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.tutofast.dto.CalificacionDTO;
+import com.tutofast.dto.ResenaDTO;
 import com.tutofast.modelo.Calificacion;
 import com.tutofast.modelo.CalificacionAlEstudiante;
 import com.tutofast.modelo.CalificacionAlTutor;
@@ -31,5 +32,11 @@ public final class CalificacionMapper {
         return new CalificacionDTO(c.getId(), c.getTipo(), c.getServicioId(), c.getAutorId(), c.getDestinatarioId(),
                 c.getComentario(), c.calcularPromedio(), criterios, c.getFechaEmision(), c.getFechaLimite(),
                 c.isVisible());
+    }
+
+    public static ResenaDTO aResenaDTO(Calificacion c, String autorNombre) {
+        CalificacionDTO d = aDTO(c);
+        return new ResenaDTO(c.getTipo(), autorNombre, c.getComentario(), d.promedio(), d.criterios(),
+                c.getFechaEmision());
     }
 }

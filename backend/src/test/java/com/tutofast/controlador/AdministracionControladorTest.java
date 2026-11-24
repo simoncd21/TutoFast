@@ -66,7 +66,8 @@ class AdministracionControladorTest {
         identidad = new ServicioIdentidad(repoUsuarios, new BCryptPasswordEncoder(4),
                 new JwtUtil("secreto-de-prueba-con-mas-de-32-caracteres-ok", Duration.ofHours(8)), auditoria,
                 new ServicioArchivos(new AlmacenamientoEnMemoria(), List.of()),
-                new ServicioNotificaciones(mock(INotificador.class), mock(RepositorioNotificacion.class)));
+                new ServicioNotificaciones(mock(INotificador.class), mock(RepositorioNotificacion.class)),
+                mock(com.tutofast.repositorio.RepositorioAsignatura.class), mock(com.tutofast.repositorio.RepositorioCalificacion.class));
         catalogo = mock(ServicioCatalogo.class);
 
         mvc = MockMvcBuilders

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tutores · TutoFast</title>
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/estilos.css">
+  <script>
+    // Aplica el tema guardado antes de pintar para evitar parpadeos.
+    (function () {
+      var t = localStorage.getItem('tutofast_tema');
+      if (t !== 'light' && t !== 'dark') {
+        t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  <header class="navbar" data-encabezado></header>
+
+  <main class="seccion">
+    <div class="contenedor admin solicitudes">
+      <h1>Tutores</h1>
+      <div id="aviso" class="alerta" role="status" hidden></div>
+      <p id="cargando" class="texto-suave">Cargando…</p>
+
+      <div id="contenido" hidden>
+        <form id="form-filtros" class="tarjeta" novalidate>
+          <h2>Buscar tutores</h2>
+          <div class="rejilla-form">
+            <div class="campo">
+              <label for="fil-universidad">Universidad</label>
+              <select id="fil-universidad"><option value="">Cargando…</option></select>
+            </div>
+            <div class="campo">
+              <label for="fil-facultad">Facultad</label>
+              <select id="fil-facultad" disabled><option value="">Todas</option></select>
+            </div>
+            <div class="campo">
+              <label for="fil-programa">Programa</label>
+              <select id="fil-programa" disabled><option value="">Todos</option></select>
+            </div>
+            <div class="campo">
+              <label for="fil-asignatura">Asignatura</label>
+              <select id="fil-asignatura" disabled><option value="">Todas</option></select>
+            </div>
+            <div class="campo">
+              <label for="fil-modalidad">Modalidad</label>
+              <select id="fil-modalidad">
+                <option value="">Cualquiera</option>
+                <option value="VIRTUAL">Virtual</option>
+                <option value="PRESENCIAL">Presencial</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label for="fil-disponibilidad">Disponibilidad</label>
+              <input type="search" id="fil-disponibilidad" maxlength="60" placeholder="Ej.: L-J, tardes">
+            </div>
+            <div class="campo">
+              <label for="fil-calificacion">Calificación mínima</label>
+              <select id="fil-calificacion">
+                <option value="">Cualquiera</option>
+                <option value="3">3,0 o más</option>
+                <option value="4">4,0 o más</option>
+                <option value="4.5">4,5 o más</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label for="fil-orden">Ordenar por</label>
+              <select id="fil-orden">
+                <option value="calificacion">Mejor calificados</option>
+                <option value="servicios">Más servicios completados</option>
+              </select>
+            </div>
+          </div>
+          <div class="campo campo--casilla">
+            <label class="casilla" for="fil-verificados">
+              <input type="checkbox" id="fil-verificados">
+              Solo tutores verificados
+            </label>
+          </div>
+          <div class="barra-acciones">
+            <button class="btn btn--primario" type="submit">Buscar</button>
+            <button class="btn btn--borde" type="button" id="filtros-limpiar">Limpiar filtros</button>
+          </div>
+        </form>
+
+        <div id="resultados" class="rejilla rejilla--3" aria-live="polite"></div>
+        <p id="resultados-vacio" class="texto-suave centrado" hidden>No se encontraron tutores que coincidan con los filtros seleccionados.</p>
+        <div id="paginacion" class="paginacion" hidden>
+          <button class="btn btn--borde btn--pequeno" type="button" id="pagina-anterior">← Anterior</button>
+          <span id="pagina-info" class="texto-suave"></span>
+          <button class="btn btn--borde btn--pequeno" type="button" id="pagina-siguiente">Siguiente →</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Perfil público del tutor -->
+  <div class="modal-fondo" id="modal-tutor" role="dialog" aria-modal="true" aria-labelledby="tutor-titulo">
+    <div class="modal">
+      <div class="modal__cabecera">
+        <h2 id="tutor-titulo">Perfil del tutor</h2>
+        <button class="btn btn--icono" type="button" data-cerrar-modal="modal-tutor" aria-label="Cerrar">×</button>
+      </div>
+      <div id="tutor-cuerpo"></div>
+      <div class="modal__pie">
+        <button class="btn btn--borde" type="button" data-cerrar-modal="modal-tutor">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="pie">
+    <div class="contenedor pie__interior">
+      <span>© <span id="anio"></span> TutoFast · Proyecto académico</span>
+      <span>Tutorías universitarias con precios negociables</span>
+    </div>
+  </footer>
+
+  <script type="module" src="js/paginas/tutores.js"></script>
+</body>
+</html>

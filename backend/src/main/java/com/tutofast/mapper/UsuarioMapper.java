@@ -6,10 +6,14 @@ import java.util.List;
 import com.tutofast.dto.PerfilCompletoDTO;
 import com.tutofast.dto.PerfilEstudianteDTO;
 import com.tutofast.dto.PerfilTutorDTO;
+import com.tutofast.dto.PerfilPublicoTutorDTO;
 import com.tutofast.dto.PerfilTutorVistaDTO;
+import com.tutofast.dto.ResenaDTO;
+import com.tutofast.dto.TutorResumenDTO;
 import com.tutofast.dto.SoporteDTO;
 import com.tutofast.dto.UsuarioAdminDTO;
 import com.tutofast.dto.UsuarioDTO;
+import com.tutofast.modelo.EstadoSoporte;
 import com.tutofast.modelo.NivelVerificacion;
 import com.tutofast.modelo.PerfilEstudiante;
 import com.tutofast.modelo.PerfilTutor;
@@ -50,6 +54,30 @@ public final class UsuarioMapper {
                 p.getTipoTutor(), p.getExperiencia(), p.getModalidades(), p.getDisponibilidad(),
                 p.getAsignaturasDominadasIds(), p.getCuentaBancariaCobro(), p.getNivelVerificacion(),
                 etiqueta(p.getNivelVerificacion()), p.getServiciosCompletados());
+    }
+
+    public static TutorResumenDTO aTutorResumenDTO(Usuario u) {
+        PerfilTutor p = u.getPerfilTutor();
+        return new TutorResumenDTO(u.getId(), u.getNombre(), p.getTipoTutor(),
+                p.getNivelVerificacion() == NivelVerificacion.VERIFICADO, p.getPromedioCalificacion(),
+                p.getServiciosCompletados(), List.copyOf(p.getModalidades()), List.copyOf(p.getAreasDeInteres()));
+    }
+
+    /** Perfil público: solo datos declarados y verificados; nunca la cuenta bancaria, el documento ni el correo. */
+    public static PerfilPublicoTutorDTO aPerfilPublicoDTO(Usuario u, List<String> asignaturas,
+                                                          List<ResenaDTO> resenas) {
+        PerfilTutor p = u.getPerfilTutor();
+        List<PerfilPublicoTutorDTO.SoporteAprobado> aprobados = p.getSoportes().stream()
+                .filter(s -> s.getEstado() == EstadoSoporte.APROBADO)
+                .map(s -> new PerfilPublicoTutorDTO.SoporteAprobado(s.getTipo(), s.getFechaRevision()))
+                .toList();
+        return new PerfilPublicoTutorDTO(u.getId(), u.getNombre(),
+                new PerfilPublicoTutorDTO.Declarado(p.getPresentacion(), List.copyOf(p.getAreasDeInteres()),
+                        p.getFormacion(), p.getExperiencia(), List.copyOf(p.getModalidades()),
+                        p.getDisponibilidad(), asignaturas),
+                new PerfilPublicoTutorDTO.Verificado(p.getNivelVerificacion(), etiqueta(p.getNivelVerificacion()),
+                        aprobados),
+                p.getPromedioCalificacion(), p.getServiciosCompletados(), resenas);
     }
 
     public static SoporteDTO aSoporteDTO(SoporteVerificacion s) {

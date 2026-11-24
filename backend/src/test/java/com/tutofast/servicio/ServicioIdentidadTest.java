@@ -66,7 +66,9 @@ class ServicioIdentidadTest {
                 new JwtUtil("secreto-de-prueba-con-mas-de-32-caracteres-ok", Duration.ofHours(8)),
                 com.tutofast.RepositorioAuditoriaEnMemoria.servicio(bitacora),
                 new ServicioArchivos(almacenamiento, List.of(new ContextoSoportesVerificacion(repoUsuarios))),
-                new ServicioNotificaciones(notificador, mock(RepositorioNotificacion.class)));
+                new ServicioNotificaciones(notificador, mock(RepositorioNotificacion.class)),
+                mock(com.tutofast.repositorio.RepositorioAsignatura.class),
+                mock(com.tutofast.repositorio.RepositorioCalificacion.class));
     }
 
     private List<String> acciones() {

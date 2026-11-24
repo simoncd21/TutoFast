@@ -409,3 +409,35 @@ ul.fila-badges { margin: var(--espacio-2) 0 0; padding: 0; }
 .solicitud__acciones { display: flex; flex-wrap: wrap; gap: var(--espacio-2); margin-top: auto; padding-top: var(--espacio-3); }
 .solicitud__descripcion { white-space: pre-wrap; word-break: break-word; margin-top: 0; }
 #detalle-pie { flex-wrap: wrap; }
+
+/* ===== Propuestas y negociación ===== */
+.propuestas-seccion { margin-top: var(--espacio-5); border-top: 1px solid var(--borde); padding-top: var(--espacio-4); }
+.propuestas-seccion h3 { margin-top: 0; }
+.propuestas { display: grid; gap: var(--espacio-3); }
+.propuesta {
+  display: flex; flex-direction: column; gap: var(--espacio-2);
+  padding: var(--espacio-4); border: 1px solid var(--borde); border-radius: var(--radio-md);
+  background: var(--superficie-2); color: var(--texto);
+}
+.propuesta > p { margin: 0; }
+.propuesta--seleccionada { border-color: var(--exito); background: var(--exito-suave); }
+.propuesta--inactiva { opacity: 0.7; }
+.propuesta__tutor { font-weight: 700; color: var(--color-primario); text-decoration: none; }
+.propuesta__tutor:hover { text-decoration: underline; }
+.propuesta__precio { font-size: 1.3rem; font-weight: 800; color: var(--color-primario); white-space: nowrap; }
+.propuesta__nota { font-style: italic; color: var(--texto); word-break: break-word; }
+.propuesta__aviso {
+  padding: var(--espacio-2) var(--espacio-3); border-radius: var(--radio-sm);
+  background: var(--advertencia-suave); color: var(--texto); border: 1px solid var(--advertencia);
+}
+.propuesta__acciones { display: flex; flex-wrap: wrap; gap: var(--espacio-2); margin-top: var(--espacio-2); }
+.propuesta__historial { margin: 0; padding-left: var(--espacio-5); color: var(--texto-suave); display: grid; gap: var(--espacio-1); }
+.form-propuesta { display: block; margin-top: var(--espacio-3); padding: var(--espacio-4); border: 1px dashed var(--borde); border-radius: var(--radio-md); background: var(--superficie); }
+.form-propuesta textarea { width: 100%; }
+
+/* ===== Tutores y reseñas ===== */
+.tutor__nota { margin: 0; font-weight: 700; color: var(--texto); }
+.resenas { display: grid; gap: var(--espacio-3); }
+.resena { padding: var(--espacio-3); border: 1px solid var(--borde); border-radius: var(--radio-md); background: var(--superficie-2); display: grid; gap: var(--espacio-2); }
+.resena > p { margin: 0; }
+.resena__comentario { word-break: break-word; white-space: pre-wrap; }

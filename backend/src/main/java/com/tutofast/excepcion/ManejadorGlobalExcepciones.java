@@ -15,6 +15,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -60,7 +61,8 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(cuerpo);
     }
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, MissingServletRequestParameterException.class})
+    @ExceptionHandler({HttpMessageNotReadableException.class, MissingServletRequestParameterException.class,
+            MethodArgumentTypeMismatchException.class})
     public ResponseEntity<ErrorDTO> solicitudMalFormada(Exception e) {
         return respuesta(HttpStatus.BAD_REQUEST, "VALIDACION", "La solicitud está mal formada o le faltan datos");
     }

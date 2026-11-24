@@ -18,4 +18,6 @@ public interface RepositorioPropuesta extends MongoRepository<Propuesta, String>
     boolean existsBySolicitudIdAndTutorIdAndActivaTrue(String solicitudId, String tutorId);
 
     List<Propuesta> findByTutorIdOrderByFechaCreacionDesc(String tutorId);
+
+    List<Propuesta> findBySolicitudIdAndTutorIdOrderByFechaCreacionDesc(String solicitudId, String tutorId);
 }

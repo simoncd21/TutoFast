@@ -4,6 +4,7 @@ package com.tutofast.integracion.puertos;
 public enum TipoNotificacion {
     NUEVA_PROPUESTA,
     CONTRAOFERTA,
+    PROPUESTA_ACEPTADA,
     PROPUESTA_DESCARTADA,
     SERVICIO_CONFIRMADO,
     NUEVO_MENSAJE,

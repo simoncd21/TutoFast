@@ -14,6 +14,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.support.PageableExecutionUtils;
 
 import com.tutofast.modelo.EstadoCuenta;
+import com.tutofast.modelo.NivelVerificacion;
 import com.tutofast.modelo.Rol;
 import com.tutofast.modelo.Usuario;
 
@@ -34,6 +35,43 @@ public class RepositorioUsuarioPersonalizadoImpl implements RepositorioUsuarioPe
                 Sort.by(Sort.Direction.DESC, "fechaRegistro")));
         List<Usuario> contenido = plantilla.find(consulta, Usuario.class);
         return PageableExecutionUtils.getPage(contenido, paginacion, () -> total);
+    }
+
+    @Override
+    public Page<Usuario> buscarTutores(FiltroTutores filtro, Pageable paginacion) {
+        Query consulta = construirConsultaTutores(filtro);
+        long total = plantilla.count(Query.of(consulta).limit(-1).skip(-1), Usuario.class);
+        String campo = filtro.orden() == FiltroTutores.Orden.SERVICIOS
+                ? "perfilTutor.serviciosCompletados" : "perfilTutor.promedioCalificacion";
+        consulta.with(PageRequest.of(paginacion.getPageNumber(), paginacion.getPageSize(),
+                Sort.by(Sort.Order.desc(campo), Sort.Order.asc("nombre"))));
+        List<Usuario> contenido = plantilla.find(consulta, Usuario.class);
+        return PageableExecutionUtils.getPage(contenido, paginacion, () -> total);
+    }
+
+    /** Función pura (sin E/S). Solo tutores con cuenta activa y perfil de tutor. */
+    static Query construirConsultaTutores(FiltroTutores f) {
+        List<Criteria> condiciones = new ArrayList<>();
+        condiciones.add(Criteria.where("roles").is(Rol.TUTOR));
+        condiciones.add(Criteria.where("estadoCuenta").is(EstadoCuenta.ACTIVA));
+        condiciones.add(Criteria.where("perfilTutor").exists(true));
+        if (f.asignaturaIds() != null) {
+            condiciones.add(Criteria.where("perfilTutor.asignaturasDominadasIds").in(f.asignaturaIds()));
+        }
+        if (f.modalidad() != null) {
+            condiciones.add(Criteria.where("perfilTutor.modalidades").is(f.modalidad()));
+        }
+        if (f.disponibilidad() != null && !f.disponibilidad().isBlank()) {
+            condiciones.add(Criteria.where("perfilTutor.disponibilidad")
+                    .regex(Pattern.compile(Pattern.quote(f.disponibilidad().strip()), Pattern.CASE_INSENSITIVE)));
+        }
+        if (f.calificacionMin() != null) {
+            condiciones.add(Criteria.where("perfilTutor.promedioCalificacion").gte(f.calificacionMin()));
+        }
+        if (f.soloVerificados()) {
+            condiciones.add(Criteria.where("perfilTutor.nivelVerificacion").is(NivelVerificacion.VERIFICADO));
+        }
+        return new Query(new Criteria().andOperator(condiciones));
     }
 
     /** Función pura (sin E/S) para poder probarla sin MongoDB. */

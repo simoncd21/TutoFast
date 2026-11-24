@@ -14,16 +14,18 @@ const ENLACES_POR_ROL = {
   ESTUDIANTE: [
     { texto: 'Inicio', href: 'index.html' },
     { texto: 'Solicitudes', href: 'solicitudes.html' },
+    { texto: 'Tutores', href: 'tutores.html' },
     { texto: 'Mi perfil', href: 'perfil.html' },
   ],
   TUTOR: [
     { texto: 'Inicio', href: 'index.html' },
-    { texto: 'Explorar solicitudes', href: 'solicitudes.html' },
+    { texto: 'Solicitudes y propuestas', href: 'solicitudes.html' },
     { texto: 'Mi perfil', href: 'perfil.html' },
   ],
   ADMINISTRADOR: [
     { texto: 'Inicio', href: 'index.html' },
     { texto: 'Solicitudes', href: 'solicitudes.html' },
+    { texto: 'Tutores', href: 'tutores.html' },
     { texto: 'Administración', href: 'admin.html' },
     { texto: 'Mi perfil', href: 'perfil.html' },
   ],

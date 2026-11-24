@@ -7,6 +7,9 @@ import {
   enlazarSelectsAcademicos, listarAsignaturas, llenarSelect,
 } from '../servicios/catalogo.js';
 import { exigirSesion, obtenerUsuario, rolActivo } from '../sesion.js';
+import {
+  montarPropuestas, ETIQUETA_ESTADO_PROPUESTA, ETIQUETA_TIPO_PROPUESTA,
+} from '../componentes/propuestas.js';
 
 iniciarEncabezado();
 iniciarModales();
@@ -102,10 +105,11 @@ const cargadores = {
   explorar: () => iniciarExplorar(),
   publicar: () => iniciarFormulario(),
   mias: () => cargarMias(),
+  propuestas: () => cargarMisPropuestas(),
 };
 
 function activarPestana(nombre, enfocar = false) {
-  ['explorar', 'publicar', 'mias'].forEach((p) => {
+  ['explorar', 'publicar', 'mias', 'propuestas'].forEach((p) => {
     const b = document.getElementById(`pestana-${p}`);
     const activa = p === nombre;
     b.setAttribute('aria-selected', String(activa));
@@ -116,6 +120,8 @@ function activarPestana(nombre, enfocar = false) {
   if (!cargadas.has(nombre)) {
     cargadas.add(nombre);
     cargadores[nombre]();
+  } else if (nombre === 'propuestas') {
+    cargarMisPropuestas();
   } else if (nombre === 'mias') {
     cargarMias();
   }
@@ -452,6 +458,44 @@ document.getElementById('cancelar-confirmar').addEventListener('click', async (e
   }
 });
 
+// ---------------------------------------------------------------- mis propuestas (tutor)
+async function cargarMisPropuestas() {
+  const lista = document.getElementById('propuestas-lista');
+  const vacio = document.getElementById('propuestas-vacio');
+  try {
+    const datos = await api.get('/api/propuestas/mias');
+    lista.replaceChildren(...datos.map((p) => {
+      const tarjeta = el('article', 'tarjeta solicitud');
+      const cabecera = el('div', 'oferta');
+      const [textoEstado, claseEstado] = ETIQUETA_ESTADO_PROPUESTA[p.estado] ?? [p.estado, ''];
+      cabecera.append(el('h3', 'solicitud__tema', p.solicitudTema ?? 'Solicitud'),
+        el('span', `badge ${claseEstado}`.trim(), textoEstado));
+      tarjeta.append(cabecera, el('p', 'solicitud__precio', pesos(p.precioCOP)),
+        el('p', 'texto-suave', ETIQUETA_TIPO_PROPUESTA[p.tipo] ?? p.tipo));
+      if (p.estado === 'CONTRAOFERTA_ESTUDIANTE') {
+        tarjeta.appendChild(el('p', 'propuesta__aviso', `El estudiante propone ${pesos(p.contraofertaCOP)}. Respóndele desde el detalle.`));
+      }
+      if (p.solicitudEstado) {
+        tarjeta.appendChild(el('p', 'texto-suave', `Solicitud: ${(ETIQUETA_ESTADO[p.solicitudEstado] ?? [p.solicitudEstado])[0]}`));
+      }
+      const pie = el('div', 'solicitud__acciones');
+      pie.appendChild(boton('Ver solicitud', 'btn btn--borde btn--pequeno', () => abrirDetalle(p.solicitudId)));
+      tarjeta.appendChild(pie);
+      return tarjeta;
+    }));
+    vacio.hidden = datos.length > 0;
+  } catch (e) {
+    toastError(e.message ?? 'No se pudieron cargar tus propuestas');
+  }
+}
+
+/** Tras cambiar una propuesta se actualizan las listas que ya estaban cargadas. */
+function refrescarListas() {
+  if (cargadas.has('mias')) cargarMias();
+  if (cargadas.has('propuestas')) cargarMisPropuestas();
+  if (cargadas.has('explorar')) buscar(paginaActual);
+}
+
 // ---------------------------------------------------------------- detalle
 async function abrirDetalle(id) {
   const cuerpo = document.getElementById('detalle-cuerpo');
@@ -486,7 +530,14 @@ async function abrirDetalle(id) {
       });
       nodos.push(el('h3', '', 'Archivos adjuntos'), lista);
     }
+    const seccionPropuestas = el('section', 'propuestas-seccion');
+    seccionPropuestas.setAttribute('aria-live', 'polite');
+    nodos.push(seccionPropuestas);
     cuerpo.replaceChildren(...nodos);
+    const sesion = obtenerUsuario();
+    if (sesion) {
+      montarPropuestas(seccionPropuestas, s, { usuarioId: sesion.id, rol: rolActivo(), alCambiar: refrescarListas });
+    }
 
     const acciones = [boton('Cerrar', 'btn btn--borde', () => cerrarModal('modal-detalle'))];
     const usuario = obtenerUsuario();
@@ -510,10 +561,13 @@ async function abrirDetalle(id) {
     const usuario = await exigirSesion();
     if (!usuario) return;
     if (rolActivo() === 'ESTUDIANTE') pestanas = ['explorar', 'publicar', 'mias'];
+    if (rolActivo() === 'TUTOR') pestanas = ['explorar', 'propuestas'];
     enlazarPestanas();
     document.getElementById('cargando').hidden = true;
     document.getElementById('contenido').hidden = false;
     activarPestana('explorar');
+    const idDirecto = new URLSearchParams(window.location.search).get('id');
+    if (idDirecto) abrirDetalle(idDirecto);
   } catch (err) {
     document.getElementById('cargando').hidden = true;
     mostrarAviso(err.message ?? 'No se pudo cargar la página. Inténtalo de nuevo.', 'error');

@@ -126,7 +126,8 @@ class SolicitudControladorTest {
         var auditoria = RepositorioAuditoriaEnMemoria.servicio(new ArrayList<>());
         identidad = new ServicioIdentidad(repoUsuarios, new BCryptPasswordEncoder(4),
                 new JwtUtil("secreto-de-prueba-con-mas-de-32-caracteres-ok", Duration.ofHours(8)), auditoria, archivos,
-                mock(ServicioNotificaciones.class));
+                mock(ServicioNotificaciones.class), mock(com.tutofast.repositorio.RepositorioAsignatura.class),
+                mock(com.tutofast.repositorio.RepositorioCalificacion.class));
         var servicio = new ServicioSolicitudes(repoSolicitudes, repoUsuarios, repoA, repoP, repoF, repoU,
                 mock(RepositorioPropuesta.class), mock(RepositorioServicioTutoria.class), archivos, auditoria,
                 mock(ServicioNotificaciones.class), List.of(), List.of());

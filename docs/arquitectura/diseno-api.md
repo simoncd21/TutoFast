@@ -41,12 +41,13 @@
 |---|---|---|
 | SaludControlador | `/api/salud` | — |
 | AutenticacionControlador | `/api/auth` | ServicioIdentidad |
-| UsuarioControlador | `/api/usuarios` | ServicioIdentidad, ServicioReputacion |
-| TutorControlador | `/api/tutores` | ServicioIdentidad |
+| UsuarioControlador | `/api/usuarios/yo` | ServicioIdentidad |
+| TutorControlador | `/api/tutores`, `/api/usuarios/{id}/resenas` | ServicioIdentidad |
 | CatalogoControlador | `/api/catalogos` | ServicioCatalogo |
 | ComisionControlador | `/api/comision` | ServicioCatalogo |
 | SolicitudControlador | `/api/solicitudes` | ServicioSolicitudes |
-| NegociacionControlador | `/api/solicitudes/{id}/propuestas`, `/api/propuestas`, `/api/servicios` | ServicioNegociacion |
+| PropuestaControlador | `/api/solicitudes/{id}/propuestas`, `/api/propuestas` | ServicioPropuestas |
+| NegociacionControlador | `/api/solicitudes/{id}/confirmar`, `/api/servicios` | ServicioNegociacion *(pendiente)* |
 | PagoControlador | `/api/pagos` | ServicioPagos, ServicioNegociacion |
 | MensajeControlador | `/api/solicitudes/{id}/mensajes`, `/api/mensajes` | ServicioMensajeria |
 | ArchivoControlador | `/api/archivos` | ServicioArchivos |
@@ -153,14 +154,14 @@ Si MongoDB no responde: 503 con `"estado":"DEGRADADO","baseDatos":"DOWN"`. Rende
 
 `POST /api/usuarios/yo/soportes`: la parte `datos` debe enviarse con `Content-Type: application/json`. Errores: 415 (formato o firma no permitidos), 413 (> 10 MB), 400 (archivo vacío o `tipo` inválido), 409 (ya hay 5 soportes en revisión). Si el nivel era `NO_VERIFICADO` pasa a `EN_REVISION`; un tutor `VERIFICADO` conserva su nivel.
 
-`ResenaDTO`: `{"tipo":"AL_TUTOR","autorNombre","comentario","promedio":4.83,"criterios":{...},"fechaEmision"}`.
+`ResenaDTO`: `{"tipo":"AL_TUTOR","autorNombre","comentario","promedio":4.83,"criterios":{...},"fechaEmision"}`. `GET /api/usuarios/{id}/resenas` devuelve 404 si el usuario no existe y `[]` si todavía no tiene reseñas visibles (las reseñas llegan con el módulo de reputación).
 
 ---
 
 ## 5. Tutores — `TutorControlador`
 
 ### `GET /api/tutores` · A
-Filtros: `programaId`, `asignaturaId`, `modalidad`, `disponibilidad` (texto), `calificacionMin` (0–5), `soloVerificados` (bool), `orden` (`calificacion` | `servicios`), paginación. Excluye cuentas SUSPENDIDA o BLOQUEADA.
+Filtros: `programaId`, `asignaturaId`, `modalidad`, `disponibilidad` (texto), `calificacionMin` (0–5), `soloVerificados` (bool), `orden` (`calificacion` | `servicios`), paginación (`tamano` por defecto 12, máximo 50). `asignaturaId` prevalece sobre `programaId` (que se expande a las asignaturas del programa). Solo devuelve tutores con la cuenta ACTIVA (excluye SUSPENDIDA y BLOQUEADA). Orden por defecto: mejor calificados (los que no tienen calificación quedan al final). `orden` inválido, `modalidad` desconocida o `calificacionMin` fuera de 0–5 → 400.
 
 200 `Pagina<TutorResumenDTO>`:
 ```json
@@ -171,7 +172,7 @@ Filtros: `programaId`, `asignaturaId`, `modalidad`, `disponibilidad` (texto), `c
 ```
 
 ### `GET /api/tutores/{id}` · A
-200 `PerfilPublicoTutorDTO`: `{"id","nombre","declarado":{presentacion, areasDeInteres, formacion, experiencia, modalidades, disponibilidad},"verificado":{nivelVerificacion, soportesAprobados:[{tipo, fechaRevision}]},"promedioCalificacion","serviciosCompletados","resenas":[ResenaDTO]}`. Nunca expone la cuenta bancaria ni el documento.
+200 `PerfilPublicoTutorDTO`: `{"id","nombre","declarado":{presentacion, areasDeInteres, formacion, experiencia, modalidades, disponibilidad, asignaturas:[nombre]},"verificado":{nivelVerificacion, etiqueta, soportesAprobados:[{tipo, fechaRevision}]},"promedioCalificacion","serviciosCompletados","resenas":[ResenaDTO]}`. Nunca expone la cuenta bancaria, el documento ni el correo. 404 si el tutor no existe, no tiene perfil de tutor o su cuenta no está activa.
 
 ---
 
@@ -253,31 +254,42 @@ Filtros (R07): `universidadId`, `facultadId`, `programaId`, `asignaturaId`, `tem
 
 ---
 
-## 9. Negociación y ciclo del servicio — `NegociacionControlador`
+## 9. Propuestas, negociación y ciclo del servicio — `PropuestaControlador` y `NegociacionControlador`
 
 ### `POST /api/solicitudes/{id}/propuestas` · T
 ```json
 { "tipo": "CONTRAPROPUESTA_PRECIO", "precioCOP": 30000, "duracion": "MIN_60", "modalidad": "PRESENCIAL", "nota": "Incluye material de apoyo" }
 ```
-- Con `ACEPTA_PRECIO`, el precio, la duración y la modalidad se copian de la solicitud (los que se envíen se ignoran). Con `CONTRAPROPUESTA_PRECIO` solo cambia el precio. Con `ALTERNATIVA_CONDICIONES` puede cambiar la duración (30/45/60/90/120) o la modalidad.
-- Efecto en la solicitud: la primera propuesta pasa la solicitud a PROPUESTAS_RECIBIDAS; una contrapropuesta o alternativa la pasa a NEGOCIACION_EN_CURSO. Se notifica al estudiante.
-- 201 `PropuestaVistaDTO`. 409 "La solicitud ya ha sido acordada con otro tutor y no admite nuevas propuestas". 409 `DUPLICADO` si el tutor ya tiene una propuesta activa. 403 si el tutor es el dueño de la solicitud o no tiene el rol TUTOR.
+- Con `ACEPTA_PRECIO`, el precio, la duración y la modalidad se copian de la solicitud (los que se envíen se ignoran). Con `CONTRAPROPUESTA_PRECIO` el precio es obligatorio y debe ser distinto del de la solicitud; la duración y la modalidad se mantienen. Con `ALTERNATIVA_CONDICIONES` puede cambiar la duración (30/45/60/90/120) o la modalidad (y, opcionalmente, el precio); debe cambiar al menos la duración o la modalidad.
+- Monto: mayor que cero y como máximo 5.000.000 COP; si no, 400 `VALIDACION`. `nota`: hasta 500 caracteres.
+- Efecto en la solicitud: la primera propuesta pasa la solicitud a PROPUESTAS_RECIBIDAS; una contrapropuesta o alternativa la pasa a NEGOCIACION_EN_CURSO. Se notifica al estudiante (`NUEVA_PROPUESTA`) y se audita (`PROPUESTA_ENVIADA`).
+- 201 `PropuestaVistaDTO`. 409 `SOLICITUD_NO_ADMITE_PROPUESTAS` ("La solicitud ya ha sido acordada con otro tutor y no admite nuevas propuestas") si la solicitud está en TUTOR_SELECCIONADO, FORMALIZADA o CANCELADA. 409 `DUPLICADO` si el tutor ya tiene una propuesta activa (lo garantiza el índice parcial único `uk_propuesta_activa`; tras retirar o ser descartada puede volver a proponer). 403 si el tutor es el dueño de la solicitud, no tiene el rol TUTOR o su cuenta no está activa. 404 si la solicitud no existe.
 
-### `GET /api/solicitudes/{id}/propuestas` · E (dueño ve todas) · T (solo la suya)
-200:
+`PropuestaVistaDTO`:
 ```json
-[{ "id": "6741...301", "tutor": { "id": "6741...501", "nombre": "Laura Martínez", "verificado": true, "promedioCalificacion": 4.75 },
-   "tipo": "ALTERNATIVA_CONDICIONES", "precioCOP": 30000, "duracion": "MIN_90", "modalidad": "PRESENCIAL",
-   "nota": "...", "estado": "ENVIADA", "fechaActualizacion": "..." }]
+{ "id": "6741...301", "solicitudId": "6741...201", "solicitudTema": "Derivadas de funciones compuestas", "solicitudEstado": "NEGOCIACION_EN_CURSO",
+  "tutorId": "6741...501", "tutorNombre": "Laura Martínez", "tutorVerificado": true, "tutorPromedioCalificacion": 4.75, "tutorServiciosCompletados": 12,
+  "tipo": "ALTERNATIVA_CONDICIONES", "precioCOP": 30000, "duracion": "MIN_90", "modalidad": "PRESENCIAL", "nota": "...",
+  "contraofertaCOP": null, "estado": "ENVIADA", "fechaCreacion": "...", "fechaActualizacion": "..." }
 ```
+`solicitudTema` y `solicitudEstado` se rellenan en `GET /api/solicitudes/{id}/propuestas` y en `GET /api/propuestas/mias`; `contraofertaCOP` solo tiene valor en CONTRAOFERTA_ESTUDIANTE. Estados: ENVIADA, CONTRAOFERTA_ESTUDIANTE, ACEPTADA (provisional), DESCARTADA, RETIRADA.
+
+### `GET /api/solicitudes/{id}/propuestas` · E (dueño ve todas) · T (solo la suya) · AD (todas)
+200 `PropuestaVistaDTO[]` (más recientes primero; la interfaz las ordena por precio). 403 para cualquier otro usuario; 404 si la solicitud no existe.
+
+### `GET /api/propuestas/mias` · T
+200 `PropuestaVistaDTO[]` con todas las propuestas del tutor (activas e históricas), con `solicitudTema` y `solicitudEstado`.
 
 | Método y ruta | Rol | Cuerpo | Efecto |
 |---|---|---|---|
-| `PUT /api/propuestas/{id}` | T (autor) | igual que al crear | modifica la propuesta; estado → ENVIADA; solo si la propuesta está activa y la solicitud abierta |
-| `POST /api/propuestas/{id}/retirar` | T (autor) | — | RETIRADA, `activa=false` |
-| `POST /api/propuestas/{id}/contraofertar` | E (dueño) | `{"precioCOP":27000,"nota":"¿Podría ser 27.000?"}` | estado CONTRAOFERTA_ESTUDIANTE; el precio anterior queda en la auditoría; se notifica al tutor, que responde con `PUT` |
-| `POST /api/propuestas/{id}/seleccionar` | E (dueño) | — | propuesta ACEPTADA (provisional); solicitud TUTOR_SELECCIONADO |
-| `POST /api/solicitudes/{id}/confirmar` | E (dueño) | `{"tokenPagoSimulado":"tok_aprobar"}` | ver abajo |
+| `PUT /api/propuestas/{id}` | T (autor) | igual que al crear | modifica la propuesta (también es la respuesta a una contraoferta); estado → ENVIADA y se borra la contraoferta; solo si la propuesta es ENVIADA o CONTRAOFERTA_ESTUDIANTE y la solicitud sigue abierta (409 si no). Se notifica al estudiante |
+| `POST /api/propuestas/{id}/retirar` | T (autor) | — | RETIRADA, `activa=false`; 409 si ya estaba ACEPTADA, DESCARTADA o RETIRADA |
+| `POST /api/propuestas/{id}/contraofertar` | E (dueño) | `{"precioCOP":27000,"nota":"¿Podría ser 27.000?"}` | estado CONTRAOFERTA_ESTUDIANTE y `contraofertaCOP`; el precio anterior queda en la auditoría (`PROPUESTA_CONTRAOFERTADA`); se notifica al tutor (`CONTRAOFERTA`, con la nota), que responde con `PUT`. 400 si el precio es ≤ 0 o > 5.000.000; 422 si es igual al precio propuesto; 409 si la propuesta no está ENVIADA o la solicitud ya no está abierta |
+| `POST /api/propuestas/{id}/seleccionar` | E (dueño) | — | propuesta ACEPTADA (provisional); solicitud TUTOR_SELECCIONADO; se notifica al tutor (`PROPUESTA_ACEPTADA`). 409 `CONTRAOFERTA_PENDIENTE` si la propuesta tiene una contraoferta sin responder; 409 si la solicitud ya tiene tutor seleccionado o no está abierta; 409 `TUTOR_NO_DISPONIBLE` si la cuenta del tutor dejó de estar activa |
+| `POST /api/propuestas/{id}/rechazar` | E (dueño) | opcional `{"motivo":"..."}` (hasta 300 caracteres) | DESCARTADA (`activa=false`); se notifica al tutor (`PROPUESTA_DESCARTADA`, con el motivo). 409 si ya estaba ACEPTADA, DESCARTADA o RETIRADA |
+| `POST /api/solicitudes/{id}/confirmar` | E (dueño) | `{"tokenPagoSimulado":"tok_aprobar"}` | ver abajo *(pendiente de implementar)* |
+
+`ServicioPropuestas` también ofrece `descartarPropuesta` y `descartarPropuestasDeSolicitud` (uso interno): la confirmación del servicio las usará para descartar las demás propuestas; la cancelación de la solicitud ya descarta las activas.
 
 ### `POST /api/solicitudes/{id}/confirmar` · E
 Una sola transacción: verifica TUTOR_SELECCIONADO → copia la comisión vigente → `IPasarelaPago.retener` → crea `ServicioTutoria` (CONFIRMADO) y `Pago` (RETENIDO) → descarta las demás propuestas y cierra sus hilos de chat → solicitud FORMALIZADA → notifica a ambas partes.
@@ -408,7 +420,7 @@ Las reseñas públicas se consultan en `GET /api/usuarios/{id}/resenas` (secció
 
 Parámetros de `GET /api/notificaciones`: `soloNoLeidas` (false), `pagina` (0), `tamano` (20, máximo 100).
 
-`NotificacionDTO`: `{"id","tipo","titulo","mensaje","enlace","leida","fecha"}`. Tipos: `NUEVA_PROPUESTA`, `CONTRAOFERTA`, `PROPUESTA_DESCARTADA`, `SERVICIO_CONFIRMADO`, `NUEVO_MENSAJE`, `RECORDATORIO_SESION`, `SERVICIO_FINALIZADO`, `PAGO_LIBERADO`, `CALIFICACION_PENDIENTE`, `REPORTE_RECIBIDO`, `REPORTE_RESUELTO`, `SANCION_APLICADA`, `APELACION_RESUELTA`, `SOPORTE_APROBADO`, `SOPORTE_RECHAZADO`.
+`NotificacionDTO`: `{"id","tipo","titulo","mensaje","enlace","leida","fecha"}`. Tipos: `NUEVA_PROPUESTA`, `CONTRAOFERTA`, `PROPUESTA_ACEPTADA`, `PROPUESTA_DESCARTADA`, `SERVICIO_CONFIRMADO`, `NUEVO_MENSAJE`, `RECORDATORIO_SESION`, `SERVICIO_FINALIZADO`, `PAGO_LIBERADO`, `CALIFICACION_PENDIENTE`, `REPORTE_RECIBIDO`, `REPORTE_RESUELTO`, `SANCION_APLICADA`, `APELACION_RESUELTA`, `SOPORTE_APROBADO`, `SOPORTE_RECHAZADO`.
 
 ---
 
@@ -489,43 +501,45 @@ Cola de verificación ordenada por `prioridad` (ALTA primero) y luego por `fecha
 | 33 | POST | /api/solicitudes/{id}/cancelar | E |
 | 34 | POST | /api/solicitudes/{id}/archivos | E |
 | 35 | POST | /api/solicitudes/{id}/propuestas | T |
-| 36 | GET | /api/solicitudes/{id}/propuestas | E, T |
+| 36 | GET | /api/solicitudes/{id}/propuestas | E, T, AD |
 | 37 | PUT | /api/propuestas/{id} | T |
 | 38 | POST | /api/propuestas/{id}/retirar | T |
 | 39 | POST | /api/propuestas/{id}/contraofertar | E |
 | 40 | POST | /api/propuestas/{id}/seleccionar | E |
-| 41 | POST | /api/solicitudes/{id}/confirmar | E |
-| 42 | GET | /api/servicios/mios | E, T |
-| 43 | GET | /api/servicios/{id} | Part., AD |
-| 44 | PATCH | /api/servicios/{id}/enlace | T |
-| 45 | POST | /api/servicios/{id}/iniciar | Part. |
-| 46 | POST | /api/servicios/{id}/finalizar | E |
-| 47 | GET | /api/pagos/servicio/{servicioId} | Part., AD |
-| 48 | GET | /api/pagos/mios | E, T |
-| 49 | POST | /api/pagos/simular-cierre-automatico | AD |
-| 50 | GET | /api/solicitudes/{id}/mensajes | Part., AD |
-| 51 | GET | /api/solicitudes/{id}/hilos | E, AD |
-| 52 | POST | /api/solicitudes/{id}/mensajes | Part. |
-| 53 | POST | /api/mensajes/{id}/reportar | Part. |
-| 54 | GET | /api/archivos/{id} | A (acceso por contexto) |
-| 55 | POST | /api/servicios/{id}/calificaciones | E, T |
-| 56 | GET | /api/servicios/{id}/calificaciones | Part. |
-| 57 | POST | /api/reportes | E, T |
-| 58 | GET | /api/reportes/mios | E, T |
-| 59 | GET | /api/sanciones/mias | A |
-| 60 | POST | /api/sanciones/{id}/apelaciones | A |
-| 61 | GET | /api/notificaciones | A |
-| 62 | GET | /api/notificaciones/conteo-no-leidas | A |
-| 63 | PATCH | /api/notificaciones/{id}/leida | A |
-| 64 | PATCH | /api/notificaciones/leer-todas | A |
-| 65 | GET | /api/admin/soportes | AD |
-| 66 | POST | /api/admin/usuarios/{u}/soportes/{s}/aprobar | AD |
-| 67 | POST | /api/admin/usuarios/{u}/soportes/{s}/rechazar | AD |
-| 68 | GET | /api/admin/usuarios | AD |
-| 69 | PATCH | /api/admin/usuarios/{id}/estado | AD |
-| 70 | GET | /api/admin/reportes | AD |
-| 71 | GET | /api/admin/reportes/{id} | AD |
-| 72 | POST | /api/admin/reportes/{id}/resolver | AD |
-| 73 | POST | /api/admin/sanciones/{id}/apelaciones/{a}/resolver | AD |
-| 74 | GET | /api/admin/mensajes-reportados | AD |
-| 75 | GET | /api/admin/auditoria | AD |
+| 41 | POST | /api/propuestas/{id}/rechazar | E |
+| 42 | GET | /api/propuestas/mias | T |
+| 43 | POST | /api/solicitudes/{id}/confirmar | E |
+| 44 | GET | /api/servicios/mios | E, T |
+| 45 | GET | /api/servicios/{id} | Part., AD |
+| 46 | PATCH | /api/servicios/{id}/enlace | T |
+| 47 | POST | /api/servicios/{id}/iniciar | Part. |
+| 48 | POST | /api/servicios/{id}/finalizar | E |
+| 49 | GET | /api/pagos/servicio/{servicioId} | Part., AD |
+| 50 | GET | /api/pagos/mios | E, T |
+| 51 | POST | /api/pagos/simular-cierre-automatico | AD |
+| 52 | GET | /api/solicitudes/{id}/mensajes | Part., AD |
+| 53 | GET | /api/solicitudes/{id}/hilos | E, AD |
+| 54 | POST | /api/solicitudes/{id}/mensajes | Part. |
+| 55 | POST | /api/mensajes/{id}/reportar | Part. |
+| 56 | GET | /api/archivos/{id} | A (acceso por contexto) |
+| 57 | POST | /api/servicios/{id}/calificaciones | E, T |
+| 58 | GET | /api/servicios/{id}/calificaciones | Part. |
+| 59 | POST | /api/reportes | E, T |
+| 60 | GET | /api/reportes/mios | E, T |
+| 61 | GET | /api/sanciones/mias | A |
+| 62 | POST | /api/sanciones/{id}/apelaciones | A |
+| 63 | GET | /api/notificaciones | A |
+| 64 | GET | /api/notificaciones/conteo-no-leidas | A |
+| 65 | PATCH | /api/notificaciones/{id}/leida | A |
+| 66 | PATCH | /api/notificaciones/leer-todas | A |
+| 67 | GET | /api/admin/soportes | AD |
+| 68 | POST | /api/admin/usuarios/{u}/soportes/{s}/aprobar | AD |
+| 69 | POST | /api/admin/usuarios/{u}/soportes/{s}/rechazar | AD |
+| 70 | GET | /api/admin/usuarios | AD |
+| 71 | PATCH | /api/admin/usuarios/{id}/estado | AD |
+| 72 | GET | /api/admin/reportes | AD |
+| 73 | GET | /api/admin/reportes/{id} | AD |
+| 74 | POST | /api/admin/reportes/{id}/resolver | AD |
+| 75 | POST | /api/admin/sanciones/{id}/apelaciones/{a}/resolver | AD |
+| 76 | GET | /api/admin/mensajes-reportados | AD |
+| 77 | GET | /api/admin/auditoria | AD |

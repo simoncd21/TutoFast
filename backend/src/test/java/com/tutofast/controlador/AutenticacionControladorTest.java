@@ -64,7 +64,9 @@ class AutenticacionControladorTest {
                 new com.tutofast.servicio.ServicioArchivos(new com.tutofast.AlmacenamientoEnMemoria(), java.util.List.of()),
                 new com.tutofast.servicio.ServicioNotificaciones(
                         mock(com.tutofast.integracion.puertos.INotificador.class),
-                        mock(com.tutofast.repositorio.RepositorioNotificacion.class)));
+                        mock(com.tutofast.repositorio.RepositorioNotificacion.class)),
+                mock(com.tutofast.repositorio.RepositorioAsignatura.class),
+                mock(com.tutofast.repositorio.RepositorioCalificacion.class));
 
         MongoTemplate plantilla = mock(MongoTemplate.class);
         MongoDatabase bd = mock(MongoDatabase.class);
