@@ -231,24 +231,25 @@ Notas (módulo 05): `GET /vigente` devuelve 404 mientras no exista ninguna comis
   "precioInicialCOP": 25000
 }
 ```
-- Parte(s) `archivos`: 1 a 5 archivos (PDF, PNG, JPG o DOCX de hasta 10 MB).
+- Parte(s) `archivos` (opcionales): hasta 5 archivos (PDF, PNG, JPG o DOCX de hasta 10 MB). Orden interno: validar → subir a GridFS → persistir; si persistir falla se borran los archivos subidos.
+- Reglas de validación: cuenta ACTIVA con rol ESTUDIANTE (403 si no); asignatura, programa, facultad y universidad vigentes; `fechaHora` futura; precio > 0 (se guarda como `Decimal128`, 2 decimales). Las listas de frases genéricas y de fraude son configurables con `tutofast.solicitudes.frases-genericas` y `tutofast.solicitudes.palabras-fraude` (separadas por coma; vacías = valores por defecto del dominio).
 - 201 `SolicitudDetalleDTO` con estado `PUBLICADA`.
-- 422 `REGLA_NEGOCIO`: "La descripción debe tener al menos 20 caracteres y especificar el objetivo pedagógico del tema; no se admiten textos genéricos".
-- 422 `FRAUDE_ACADEMICO`: "Solicitud rechazada: TutoFast prohíbe terminantemente la suplantación y la realización de evaluaciones calificables individuales ajenas (R06)". Además se registra en la auditoría.
+- 422 `DESCRIPCION_INSUFICIENTE`: "La descripción debe tener al menos 20 caracteres y especificar el objetivo pedagógico del tema; no se admiten textos genéricos".
+- 422 `FRAUDE_ACADEMICO`: "Solicitud rechazada: TutoFast prohíbe terminantemente la suplantación y la realización de evaluaciones calificables individuales ajenas (R06)". Además se registra en la auditoría (`FRAUDE_ACADEMICO_DETECTADO`).
 - 400 si falta un campo, si `fechaHora` está en el pasado, si la duración no es 30/60/120, si la asignatura está inactiva o si la modalidad es presencial sin `zonaEncuentro`.
 
 ### `GET /api/solicitudes` · A
-Filtros (R07): `universidadId`, `facultadId`, `programaId`, `asignaturaId`, `tema` (texto), `modalidad`, `fechaDesde`, `fechaHasta`, `precioMin`, `precioMax`, `orden` (`recientes` | `precioAsc` | `precioDesc` | `fecha`), paginación. Solo devuelve solicitudes PUBLICADA, PROPUESTAS_RECIBIDAS o NEGOCIACION_EN_CURSO. Si no hay resultados: 200 con `contenido: []`, y la interfaz muestra "No se encontraron solicitudes que coincidan con los filtros seleccionados".
+Filtros (R07): `universidadId`, `facultadId`, `programaId`, `asignaturaId`, `tema` (texto), `modalidad`, `fechaDesde`, `fechaHasta`, `precioMin`, `precioMax`, `orden` (`recientes` | `precioAsc` | `precioDesc` | `fecha`), paginación. Solo devuelve solicitudes PUBLICADA, PROPUESTAS_RECIBIDAS o NEGOCIACION_EN_CURSO. `orden` inválido → 400; `tamano` máximo 50 (por defecto 12). Si no hay resultados: 200 con `contenido: []`, y la interfaz muestra "No se encontraron solicitudes que coincidan con los filtros seleccionados".
 
 `SolicitudResumenDTO`: `{"id","tema","asignaturaNombre","programaNombre","modalidad","duracion","precioInicialCOP","fechaHora","estado","totalPropuestas","estudianteNombre","estudianteConfiabilidad"}`.
 
 | Método y ruta | Rol | Notas |
 |---|---|---|
 | `GET /api/solicitudes/mias` | E | todas las del estudiante, en cualquier estado |
-| `GET /api/solicitudes/{id}` | A | `SolicitudDetalleDTO` (incluye `archivos[]` con `archivoId`, y `servicioId` si existe) |
-| `PUT /api/solicitudes/{id}` | E (dueño) | `EditarSolicitudDTO` (mismos campos que al crear); 409 "La solicitud no puede modificarse tras la confirmación bilateral" (R05) |
-| `POST /api/solicitudes/{id}/cancelar` | E (dueño) | 200 → CANCELADA; propuestas → DESCARTADA; 409 si ya está FORMALIZADA ("cualquier cancelación posterior a la confirmación debe canalizarse mediante el módulo de reportes y soporte") |
-| `POST /api/solicitudes/{id}/archivos` | E (dueño) | multipart `archivos`; 201 `ArchivoDTO[]`; solo antes de confirmar |
+| `GET /api/solicitudes/{id}` | A | `SolicitudDetalleDTO` (incluye `archivos[]` con `archivoId`, y `servicioId` si existe). Una solicitud fuera de los estados explorables solo la ve su dueño o un administrador (403) |
+| `PUT /api/solicitudes/{id}` | E (dueño) | JSON `SolicitudEntradaDTO` (mismos campos que la parte `datos` al crear; se revalida la integridad); 409 "La solicitud no puede modificarse tras la confirmación bilateral" (R05) |
+| `POST /api/solicitudes/{id}/cancelar` | E (dueño) | 200 → CANCELADA; propuestas activas → DESCARTADA (y se notifica a los tutores); 409 si ya está FORMALIZADA ("cualquier cancelación posterior a la confirmación debe canalizarse mediante el módulo de reportes y soporte") |
+| `POST /api/solicitudes/{id}/archivos` | E (dueño) | multipart `archivos`; 201 `ArchivoDTO[]`; solo antes de confirmar; máximo 5 por solicitud (400) |
 
 ---
 

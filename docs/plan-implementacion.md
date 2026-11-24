@@ -126,16 +126,19 @@ Grafo de dependencias:
 
 ## Módulo 06 · `feature/06-solicitudes-busqueda`
 **Depende de:** 04, 05
-- [ ] `servicio/ServicioSolicitudes` (`publicarSolicitud`, `editarSolicitud`, `cancelarSolicitud`, `buscarSolicitudes`, `validarIntegridad` con listas configurables de frases genéricas y palabras de fraude).
-- [ ] Orden en la publicación: validar → subir a GridFS → persistir (compensar si falla).
-- [ ] `ServicioIdentidad.buscarTutores`.
-- [ ] Controladores: SolicitudControlador, TutorControlador.
-- [ ] Endpoints: `POST/GET /api/solicitudes`, `GET /api/solicitudes/mias`, `GET/PUT /api/solicitudes/{id}`, `POST /api/solicitudes/{id}/cancelar`, `POST /api/solicitudes/{id}/archivos`, `GET /api/tutores`, `GET /api/tutores/{id}`, `GET /api/usuarios/{id}/resenas`.
-- [ ] Frontend: `solicitudes.html` (publicar, mis solicitudes, explorar con filtros, buscar tutores); perfil público en `perfil.html?id=`.
+- [x] `servicio/ServicioSolicitudes` (`publicarSolicitud`, `editarSolicitud`, `cancelarSolicitud`, `buscarSolicitudes`, `validarIntegridad` con listas configurables de frases genéricas y palabras de fraude).
+- [x] Orden en la publicación: validar → subir a GridFS → persistir (compensar si falla).
+- [ ] `ServicioIdentidad.buscarTutores`. *(pendiente: fuera del alcance de la primera entrega del módulo; se retomará junto con la búsqueda de tutores)*
+- [x] `SolicitudControlador`. [ ] `TutorControlador` *(pendiente, ver arriba)*.
+- [x] Endpoints de solicitudes: `POST/GET /api/solicitudes`, `GET /api/solicitudes/mias`, `GET/PUT /api/solicitudes/{id}`, `POST /api/solicitudes/{id}/cancelar`, `POST /api/solicitudes/{id}/archivos`.
+- [ ] Endpoints pendientes: `GET /api/tutores`, `GET /api/tutores/{id}`, `GET /api/usuarios/{id}/resenas`.
+- [x] Frontend: `solicitudes.html` (explorar con filtros, publicar/editar, mis solicitudes con cancelación, detalle con adjuntos) y enlace en `encabezado.js`.
+- [ ] Pendiente: buscar tutores y perfil público en `perfil.html?id=`.
+- [x] `ContextoSolicitudes`: los adjuntos de una solicitud los ve su dueño, un administrador y, mientras está abierta, los tutores.
 
 **Pruebas**
-- [ ] `ServicioSolicitudesTest`: "necesito ayuda con matemáticas" → 422; "resolver examen parcial en vivo" → 422 `FRAUDE_ACADEMICO` + auditoría; duración 90 → 400; cancelar después de FORMALIZADA → 409.
-- [ ] Búsqueda sin resultados → mensaje vacío en la interfaz.
+- [x] `ServicioSolicitudesTest` (31 casos) y `SolicitudControladorTest`: "necesito ayuda con matemáticas" → 422; "resolver examen parcial en vivo" → 422 `FRAUDE_ACADEMICO` + auditoría; duración 90 → 400; cancelar después de FORMALIZADA → 409.
+- [x] Búsqueda sin resultados → mensaje vacío en la interfaz.
 
 ## Módulo 07 · `feature/07-negociacion-confirmacion`
 **Depende de:** 06

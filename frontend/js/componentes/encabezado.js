@@ -11,10 +11,19 @@ const ENLACES_PUBLICOS = [
   { texto: 'Beneficios', href: 'index.html#beneficios' },
 ];
 const ENLACES_POR_ROL = {
-  ESTUDIANTE: [{ texto: 'Inicio', href: 'index.html' }, { texto: 'Mi perfil', href: 'perfil.html' }],
-  TUTOR: [{ texto: 'Inicio', href: 'index.html' }, { texto: 'Mi perfil', href: 'perfil.html' }],
+  ESTUDIANTE: [
+    { texto: 'Inicio', href: 'index.html' },
+    { texto: 'Solicitudes', href: 'solicitudes.html' },
+    { texto: 'Mi perfil', href: 'perfil.html' },
+  ],
+  TUTOR: [
+    { texto: 'Inicio', href: 'index.html' },
+    { texto: 'Explorar solicitudes', href: 'solicitudes.html' },
+    { texto: 'Mi perfil', href: 'perfil.html' },
+  ],
   ADMINISTRADOR: [
     { texto: 'Inicio', href: 'index.html' },
+    { texto: 'Solicitudes', href: 'solicitudes.html' },
     { texto: 'Administración', href: 'admin.html' },
     { texto: 'Mi perfil', href: 'perfil.html' },
   ],

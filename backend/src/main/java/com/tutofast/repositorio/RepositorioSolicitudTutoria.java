@@ -1,6 +1,7 @@
 package com.tutofast.repositorio;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.mongodb.repository.MongoRepository;
 
@@ -11,6 +12,8 @@ public interface RepositorioSolicitudTutoria
         extends MongoRepository<SolicitudTutoria, String>, RepositorioSolicitudTutoriaPersonalizado {
 
     List<SolicitudTutoria> findByEstudianteIdOrderByFechaCreacionDesc(String estudianteId);
+
+    Optional<SolicitudTutoria> findByArchivosGridFsId(String gridFsId);
 
     long countByEstado(EstadoSolicitud estado);
 }

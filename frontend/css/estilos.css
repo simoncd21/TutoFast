@@ -399,3 +399,13 @@ ul.fila-badges { margin: var(--espacio-2) 0 0; padding: 0; }
 .paginacion { display: flex; align-items: center; justify-content: space-between; gap: var(--espacio-3); }
 .comision-actual { font-size: 2.2rem; font-weight: 800; color: var(--color-primario); line-height: 1; }
 .admin__formulario { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 var(--espacio-4); align-items: end; }
+
+/* ===== Solicitudes de tutoría ===== */
+.solicitudes { max-width: var(--ancho-max); }
+.solicitud { display: flex; flex-direction: column; gap: var(--espacio-2); }
+.solicitud__tema { margin: 0; font-size: 1.05rem; line-height: 1.3; word-break: break-word; }
+.solicitud > p { margin: 0; }
+.solicitud__precio { font-size: 1.4rem; font-weight: 800; color: var(--color-primario); }
+.solicitud__acciones { display: flex; flex-wrap: wrap; gap: var(--espacio-2); margin-top: auto; padding-top: var(--espacio-3); }
+.solicitud__descripcion { white-space: pre-wrap; word-break: break-word; margin-top: 0; }
+#detalle-pie { flex-wrap: wrap; }

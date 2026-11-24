@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solicitudes de tutoría · TutoFast</title>
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/estilos.css">
+  <script>
+    // Aplica el tema guardado antes de pintar para evitar parpadeos.
+    (function () {
+      var t = localStorage.getItem('tutofast_tema');
+      if (t !== 'light' && t !== 'dark') {
+        t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  <header class="navbar" data-encabezado></header>
+
+  <main class="seccion">
+    <div class="contenedor admin solicitudes">
+      <h1>Solicitudes de tutoría</h1>
+      <div id="aviso" class="alerta" role="status" hidden></div>
+      <p id="cargando" class="texto-suave">Cargando…</p>
+
+      <div id="contenido" hidden>
+        <div class="pestanas pestanas--admin" role="tablist" aria-label="Secciones de solicitudes">
+          <button class="pestana" type="button" role="tab" id="pestana-explorar" aria-controls="panel-explorar" aria-selected="true">Explorar</button>
+          <button class="pestana" type="button" role="tab" id="pestana-publicar" aria-controls="panel-publicar" aria-selected="false" tabindex="-1" hidden>Publicar</button>
+          <button class="pestana" type="button" role="tab" id="pestana-mias" aria-controls="panel-mias" aria-selected="false" tabindex="-1" hidden>Mis solicitudes</button>
+        </div>
+
+        <!-- Explorar -->
+        <section id="panel-explorar" class="admin__panel" role="tabpanel" aria-labelledby="pestana-explorar">
+          <form id="form-filtros" class="tarjeta" novalidate>
+            <h2>Buscar solicitudes</h2>
+            <div class="rejilla-form">
+              <div class="campo">
+                <label for="fil-universidad">Universidad</label>
+                <select id="fil-universidad"><option value="">Cargando…</option></select>
+              </div>
+              <div class="campo">
+                <label for="fil-facultad">Facultad</label>
+                <select id="fil-facultad" disabled><option value="">Todas</option></select>
+              </div>
+              <div class="campo">
+                <label for="fil-programa">Programa</label>
+                <select id="fil-programa" disabled><option value="">Todos</option></select>
+              </div>
+              <div class="campo">
+                <label for="fil-asignatura">Asignatura</label>
+                <select id="fil-asignatura" disabled><option value="">Todas</option></select>
+              </div>
+              <div class="campo">
+                <label for="fil-tema">Tema</label>
+                <input type="search" id="fil-tema" maxlength="100" placeholder="Ej.: integrales, listas enlazadas">
+              </div>
+              <div class="campo">
+                <label for="fil-modalidad">Modalidad</label>
+                <select id="fil-modalidad">
+                  <option value="">Cualquiera</option>
+                  <option value="VIRTUAL">Virtual</option>
+                  <option value="PRESENCIAL">Presencial</option>
+                </select>
+              </div>
+              <div class="campo">
+                <label for="fil-precio-min">Precio mínimo (COP)</label>
+                <input type="number" id="fil-precio-min" min="0" step="1000" inputmode="numeric">
+              </div>
+              <div class="campo">
+                <label for="fil-precio-max">Precio máximo (COP)</label>
+                <input type="number" id="fil-precio-max" min="0" step="1000" inputmode="numeric">
+              </div>
+              <div class="campo">
+                <label for="fil-desde">Desde</label>
+                <input type="date" id="fil-desde">
+              </div>
+              <div class="campo">
+                <label for="fil-hasta">Hasta</label>
+                <input type="date" id="fil-hasta">
+              </div>
+              <div class="campo">
+                <label for="fil-orden">Ordenar por</label>
+                <select id="fil-orden">
+                  <option value="recientes">Más recientes</option>
+                  <option value="fecha">Fecha de la tutoría</option>
+                  <option value="precioAsc">Precio: menor a mayor</option>
+                  <option value="precioDesc">Precio: mayor a menor</option>
+                </select>
+              </div>
+            </div>
+            <div class="barra-acciones">
+              <button class="btn btn--primario" type="submit">Buscar</button>
+              <button class="btn btn--borde" type="button" id="filtros-limpiar">Limpiar filtros</button>
+            </div>
+          </form>
+
+          <div id="resultados" class="rejilla rejilla--3" aria-live="polite"></div>
+          <p id="resultados-vacio" class="texto-suave centrado" hidden>No se encontraron solicitudes que coincidan con los filtros seleccionados.</p>
+          <div id="paginacion" class="paginacion" hidden>
+            <button class="btn btn--borde btn--pequeno" type="button" id="pagina-anterior">← Anterior</button>
+            <span id="pagina-info" class="texto-suave"></span>
+            <button class="btn btn--borde btn--pequeno" type="button" id="pagina-siguiente">Siguiente →</button>
+          </div>
+        </section>
+
+        <!-- Publicar / editar -->
+        <section id="panel-publicar" class="admin__panel" role="tabpanel" aria-labelledby="pestana-publicar" hidden>
+          <form id="form-solicitud" class="tarjeta" novalidate>
+            <div class="oferta">
+              <h2 id="form-titulo">Publicar una solicitud</h2>
+              <button class="btn btn--borde btn--pequeno" type="button" id="form-cancelar-edicion" hidden>Cancelar edición</button>
+            </div>
+            <fieldset class="campo">
+              <legend>¿Qué asignatura necesitas?</legend>
+              <div class="rejilla-form">
+                <div class="campo">
+                  <label for="sol-universidad">Universidad</label>
+                  <select id="sol-universidad"><option value="">Cargando…</option></select>
+                </div>
+                <div class="campo">
+                  <label for="sol-facultad">Facultad</label>
+                  <select id="sol-facultad" disabled><option value="">Selecciona una facultad</option></select>
+                </div>
+                <div class="campo">
+                  <label for="sol-programa">Programa</label>
+                  <select id="sol-programa" disabled><option value="">Selecciona un programa</option></select>
+                </div>
+                <div class="campo">
+                  <label for="sol-asignatura">Asignatura</label>
+                  <select id="sol-asignatura" name="asignaturaId" disabled required><option value="">Selecciona una asignatura</option></select>
+                  <div class="campo__error" data-error-de="asignaturaId" hidden></div>
+                </div>
+              </div>
+            </fieldset>
+            <div class="campo">
+              <label for="sol-tema">Tema</label>
+              <input type="text" id="sol-tema" name="tema" maxlength="200" required>
+              <div class="campo__error" data-error-de="tema" hidden></div>
+            </div>
+            <div class="campo">
+              <label for="sol-descripcion">Descripción</label>
+              <textarea id="sol-descripcion" name="descripcion" maxlength="2000" rows="4" required></textarea>
+              <div class="campo__ayuda">Mínimo 20 caracteres. Explica el objetivo pedagógico del tema; no se admiten textos genéricos ni la realización de evaluaciones calificables.</div>
+              <div class="campo__error" data-error-de="descripcion" hidden></div>
+            </div>
+            <div class="rejilla-form">
+              <div class="campo">
+                <label for="sol-tipo">Tipo de servicio</label>
+                <select id="sol-tipo" name="tipoServicio" required>
+                  <option value="EXPLICACION_TEMA">Explicación de un tema</option>
+                  <option value="RESOLUCION_GUIADA_EJERCICIOS">Resolución guiada de ejercicios</option>
+                  <option value="PREPARACION_EXAMEN">Preparación de examen</option>
+                  <option value="REVISION_TRABAJO">Revisión de trabajo</option>
+                </select>
+                <div class="campo__error" data-error-de="tipoServicio" hidden></div>
+              </div>
+              <div class="campo">
+                <label for="sol-fecha">Fecha y hora</label>
+                <input type="datetime-local" id="sol-fecha" name="fechaHora" required>
+                <div class="campo__error" data-error-de="fechaHora" hidden></div>
+              </div>
+              <div class="campo">
+                <label for="sol-duracion">Duración</label>
+                <select id="sol-duracion" name="duracion" required>
+                  <option value="MIN_30">30 minutos</option>
+                  <option value="MIN_60" selected>60 minutos</option>
+                  <option value="MIN_120">120 minutos</option>
+                </select>
+                <div class="campo__error" data-error-de="duracion" hidden></div>
+              </div>
+              <div class="campo">
+                <label for="sol-precio">Precio inicial (COP)</label>
+                <input type="number" id="sol-precio" name="precioInicialCOP" min="1000" step="500" inputmode="numeric" required>
+                <div class="campo__ayuda">Los tutores podrán aceptarlo o contraofertar.</div>
+                <div class="campo__error" data-error-de="precioInicialCOP" hidden></div>
+              </div>
+              <div class="campo">
+                <label for="sol-modalidad">Modalidad</label>
+                <select id="sol-modalidad" name="modalidad" required>
+                  <option value="VIRTUAL">Virtual</option>
+                  <option value="PRESENCIAL">Presencial</option>
+                </select>
+                <div class="campo__error" data-error-de="modalidad" hidden></div>
+              </div>
+              <div class="campo" id="campo-zona" hidden>
+                <label for="sol-zona">Zona de encuentro segura</label>
+                <input type="text" id="sol-zona" name="zonaEncuentro" maxlength="200" placeholder="Biblioteca central, sala 3">
+                <div class="campo__error" data-error-de="zonaEncuentro" hidden></div>
+              </div>
+            </div>
+            <div class="campo">
+              <label for="sol-archivos">Archivos de apoyo (opcional)</label>
+              <input type="file" id="sol-archivos" multiple accept=".pdf,.png,.jpg,.jpeg,.docx">
+              <div class="campo__ayuda">Hasta 5 archivos (PDF, PNG, JPG o DOCX de hasta 10 MB cada uno).</div>
+              <div class="campo__error" data-error-de="archivos" hidden></div>
+            </div>
+            <button class="btn btn--primario" type="submit" id="form-enviar">Publicar solicitud</button>
+          </form>
+        </section>
+
+        <!-- Mis solicitudes -->
+        <section id="panel-mias" class="admin__panel" role="tabpanel" aria-labelledby="pestana-mias" hidden>
+          <div id="mias-lista" class="rejilla rejilla--3" aria-live="polite"></div>
+          <p id="mias-vacio" class="texto-suave centrado" hidden>Aún no has publicado solicitudes.</p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- Detalle -->
+  <div class="modal-fondo" id="modal-detalle" role="dialog" aria-modal="true" aria-labelledby="detalle-titulo">
+    <div class="modal">
+      <div class="modal__cabecera">
+        <h2 id="detalle-titulo">Detalle</h2>
+        <button class="btn btn--icono" type="button" data-cerrar-modal="modal-detalle" aria-label="Cerrar">×</button>
+      </div>
+      <div id="detalle-cuerpo"></div>
+      <div class="modal__pie" id="detalle-pie"></div>
+    </div>
+  </div>
+
+  <!-- Confirmar cancelación -->
+  <div class="modal-fondo" id="modal-cancelar" role="dialog" aria-modal="true" aria-labelledby="cancelar-titulo">
+    <div class="modal">
+      <div class="modal__cabecera">
+        <h2 id="cancelar-titulo">Cancelar solicitud</h2>
+        <button class="btn btn--icono" type="button" data-cerrar-modal="modal-cancelar" aria-label="Cerrar">×</button>
+      </div>
+      <p>¿Seguro que quieres cancelar «<strong id="cancelar-tema"></strong>»? Las propuestas de los tutores serán descartadas.</p>
+      <div class="modal__pie">
+        <button class="btn btn--borde" type="button" data-cerrar-modal="modal-cancelar">Volver</button>
+        <button class="btn btn--peligro" type="button" id="cancelar-confirmar">Sí, cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="pie">
+    <div class="contenedor pie__interior">
+      <span>© <span id="anio"></span> TutoFast · Proyecto académico</span>
+      <span>Tutorías universitarias con precios negociables</span>
+    </div>
+  </footer>
+
+  <script type="module" src="js/paginas/solicitudes.js"></script>
+</body>
+</html>
