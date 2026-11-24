@@ -1,5 +1,6 @@
 package com.tutofast.repositorio;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,4 +19,10 @@ public interface RepositorioCalificacion extends MongoRepository<Calificacion, S
     boolean existsByServicioIdAndTipo(String servicioId, TipoCalificacion tipo);
 
     List<Calificacion> findByDestinatarioIdAndVisibleTrueOrderByFechaEmisionDesc(String destinatarioId);
+
+    /** Reseñas reportadas que ningún administrador ha resuelto (cola de moderación). */
+    List<Calificacion> findByReportadaTrueAndModeracionIsNullOrderByFechaReporteDesc();
+
+    /** Reseñas aún ocultas cuyo plazo de 14 días ya venció (se publican solas); las ocultadas por moderación no. */
+    List<Calificacion> findByVisibleFalseAndOcultaPorModeracionFalseAndFechaLimiteLessThanEqual(Instant ahora);
 }

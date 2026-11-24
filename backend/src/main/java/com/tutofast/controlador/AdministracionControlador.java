@@ -14,9 +14,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.tutofast.dto.CambioEstadoCuentaDTO;
+import com.tutofast.dto.MensajeReportadoDTO;
+import com.tutofast.dto.ModeracionEntradaDTO;
 import com.tutofast.dto.Pagina;
 import com.tutofast.dto.RechazoSoporteDTO;
 import com.tutofast.dto.RegistroAuditoriaDTO;
+import com.tutofast.dto.ResenaReportadaDTO;
 import com.tutofast.dto.RevisionSoporteDTO;
 import com.tutofast.dto.SoporteColaDTO;
 import com.tutofast.dto.SoporteDTO;
@@ -28,6 +31,8 @@ import com.tutofast.seguridad.RolesPermitidos;
 import com.tutofast.seguridad.UsuarioAutenticado;
 import com.tutofast.servicio.ServicioAuditoria;
 import com.tutofast.servicio.ServicioIdentidad;
+import com.tutofast.servicio.ServicioMensajeria;
+import com.tutofast.servicio.ServicioReputacion;
 
 import jakarta.validation.Valid;
 
@@ -39,10 +44,39 @@ public class AdministracionControlador {
 
     private final ServicioIdentidad identidad;
     private final ServicioAuditoria auditoria;
+    private final ServicioMensajeria mensajeria;
+    private final ServicioReputacion reputacion;
 
-    public AdministracionControlador(ServicioIdentidad identidad, ServicioAuditoria auditoria) {
+    public AdministracionControlador(ServicioIdentidad identidad, ServicioAuditoria auditoria,
+                                     ServicioMensajeria mensajeria, ServicioReputacion reputacion) {
         this.identidad = identidad;
         this.auditoria = auditoria;
+        this.mensajeria = mensajeria;
+        this.reputacion = reputacion;
+    }
+
+    // ---- Moderación de mensajes y reseñas ----
+
+    @GetMapping("/mensajes-reportados")
+    public List<MensajeReportadoDTO> mensajesReportados(@RequestParam(defaultValue = "false") boolean incluirModerados) {
+        return mensajeria.listarReportados(incluirModerados);
+    }
+
+    @PostMapping("/mensajes-reportados/{mensajeId}/moderar")
+    public MensajeReportadoDTO moderarMensaje(UsuarioAutenticado admin, @PathVariable String mensajeId,
+                                              @Valid @RequestBody ModeracionEntradaDTO dto) {
+        return mensajeria.moderarMensaje(admin.id(), mensajeId, dto);
+    }
+
+    @GetMapping("/resenas-reportadas")
+    public List<ResenaReportadaDTO> resenasReportadas() {
+        return reputacion.listarResenasReportadas();
+    }
+
+    @PostMapping("/resenas-reportadas/{calificacionId}/moderar")
+    public ResenaReportadaDTO moderarResena(UsuarioAutenticado admin, @PathVariable String calificacionId,
+                                            @Valid @RequestBody ModeracionEntradaDTO dto) {
+        return reputacion.moderarResena(admin.id(), calificacionId, dto);
     }
 
     @GetMapping("/soportes")

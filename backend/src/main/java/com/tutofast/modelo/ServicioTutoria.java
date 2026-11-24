@@ -46,6 +46,9 @@ public class ServicioTutoria {
     private Instant fechaInicio;
     private Instant fechaFinalizacion;
     private EstadoServicio estado = EstadoServicio.CONFIRMADO;
+    /** Marcas de las tareas programadas para no repetir recordatorios. */
+    private boolean recordatorioEnviado;
+    private boolean recordatorioCalificacionEnviado;
 
     /**
      * Confirmación bilateral: congela las condiciones de la propuesta aceptada y la comisión vigente, y formaliza la
@@ -184,6 +187,10 @@ public class ServicioTutoria {
     public void setFechaInicio(Instant fechaInicio) { this.fechaInicio = fechaInicio; }
     public Instant getFechaFinalizacion() { return fechaFinalizacion; }
     public void setFechaFinalizacion(Instant fechaFinalizacion) { this.fechaFinalizacion = fechaFinalizacion; }
+    public boolean isRecordatorioEnviado() { return recordatorioEnviado; }
+    public void setRecordatorioEnviado(boolean recordatorioEnviado) { this.recordatorioEnviado = recordatorioEnviado; }
+    public boolean isRecordatorioCalificacionEnviado() { return recordatorioCalificacionEnviado; }
+    public void setRecordatorioCalificacionEnviado(boolean valor) { this.recordatorioCalificacionEnviado = valor; }
     public EstadoServicio getEstado() { return estado; }
     public void setEstado(EstadoServicio estado) { this.estado = estado; }
 }

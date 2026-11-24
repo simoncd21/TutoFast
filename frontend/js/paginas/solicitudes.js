@@ -10,6 +10,7 @@ import { exigirSesion, obtenerUsuario, rolActivo } from '../sesion.js';
 import {
   montarPropuestas, ETIQUETA_ESTADO_PROPUESTA, ETIQUETA_TIPO_PROPUESTA,
 } from '../componentes/propuestas.js';
+import { montarMensajeria } from '../componentes/chat.js';
 
 iniciarEncabezado();
 iniciarModales();
@@ -533,10 +534,17 @@ async function abrirDetalle(id) {
     const seccionPropuestas = el('section', 'propuestas-seccion');
     seccionPropuestas.setAttribute('aria-live', 'polite');
     nodos.push(seccionPropuestas);
+    const seccionChat = el('section', 'chat-seccion');
+    nodos.push(seccionChat);
     cuerpo.replaceChildren(...nodos);
     const sesion = obtenerUsuario();
     if (sesion) {
       montarPropuestas(seccionPropuestas, s, { usuarioId: sesion.id, rol: rolActivo(), alCambiar: refrescarListas });
+      // Chat por tutor (el enlace de una notificación puede traer ?tutorId= para abrir ese hilo).
+      montarMensajeria(seccionChat, s, {
+        usuarioId: sesion.id, rol: rolActivo(),
+        tutorIdInicial: new URLSearchParams(window.location.search).get('tutorId'),
+      });
     }
 
     const acciones = [boton('Cerrar', 'btn btn--borde', () => cerrarModal('modal-detalle'))];

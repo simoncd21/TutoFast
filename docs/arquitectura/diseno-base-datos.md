@@ -262,6 +262,8 @@ Guarda las condiciones congeladas al confirmar (R09). Ningún endpoint modifica 
   "estado": "CONFIRMADO"
 }
 ```
+Campos de las tareas programadas (+): `recordatorioEnviado` (recordatorio de sesión, una vez) y `recordatorioCalificacionEnviado` (recordatorio de calificación a los 7 días). `serviciosCompletados` del tutor se recalcula contando los servicios FINALIZADOS.
+
 Índices: `{solicitudId: 1}` único; `{propuestaId: 1}` único; `{estudianteId: 1, estado: 1}`; `{tutorId: 1, estado: 1}`; `{estado: 1, fechaHora: 1}` (programador de tareas).
 
 ### 5.4 `pagos` — Pago
@@ -289,7 +291,7 @@ Guarda las condiciones congeladas al confirmar (R09). Ningún endpoint modifica 
 - Índices: `{servicioId: 1}` único; `{referenciaPasarela: 1}` único *sparse*; `{estado: 1}`.
 
 ### 5.5 `mensajes` — Mensaje (+ Archivo embebido 0..1)
-Cada hilo de chat se identifica por `(solicitudId, tutorId)` para que los tutores que negocian la misma solicitud no lean las conversaciones de los demás. Los mensajes son **inmutables**: ninguna operación los edita ni los borra; solo se cambian `reportado` y `motivoReporte`.
+Cada hilo de chat se identifica por `(solicitudId, tutorId)` para que los tutores que negocian la misma solicitud no lean las conversaciones de los demás. Los mensajes son **inmutables**: ninguna operación edita ni borra su `contenido` ni su `archivo`; solo cambian el reporte (`reportado`, `motivoReporte`, `detalleReporte`, `reportadoPorId`, `fechaReporte`), la marca de lectura `leido` y la `moderacion` (embebida: `decision` DESESTIMAR | CONFIRMAR_INFRACCION, `observacion`, `moderadoPor`, `fecha`, `sancionId`). Un mensaje sin `emisorId` es un aviso del sistema (nace `leido=true`, no se reporta). La cola de moderación es `reportado=true` y `moderacion` nula.
 
 ```json
 {
@@ -308,6 +310,8 @@ Cada hilo de chat se identifica por `(solicitudId, tutorId)` para que los tutore
   }
 }
 ```
+Control de acceso a los adjuntos: `ContextoMensajes` (participantes del hilo y administradores; un mensaje retirado solo lo ve el administrador).
+
 Índices: `{solicitudId: 1, tutorId: 1, marcaTemporal: 1}` (polling `desde`); parcial `{reportado: 1, marcaTemporal: -1}` con `partialFilterExpression: {reportado: true}`.
 
 ---
@@ -347,7 +351,7 @@ Herencia en una sola colección. Cada subclase lleva `@TypeAlias("AL_TUTOR")` / 
 }
 ```
 - Criterios de 1 a 5. `calcularPromedio()` = media de los criterios. `fechaLimite` = `fechaFinalizacion` + 14 días.
-- `visible` (+) pasa a `true` cuando ambas partes calificaron o cuando vence `fechaLimite` (HU-09).
+- `visible` (+) pasa a `true` cuando ambas partes calificaron o cuando vence `fechaLimite` (HU-09). Moderación (+): `reportada`, `motivoReporte`, `reportadaPorId`, `fechaReporte`, `ocultaPorModeracion` y `moderacion` (embebida, igual que en `mensajes`). Una reseña con `ocultaPorModeracion=true` queda con `visible=false` para siempre: no se publica ni cuenta en ningún promedio.
 - Índices: `{servicioId: 1, tipo: 1}` **único** (máximo 2 calificaciones por servicio, «0..2»); `{destinatarioId: 1, visible: 1, fechaEmision: -1}`.
 
 ---
@@ -461,7 +465,8 @@ Herencia en una sola colección. Cada subclase lleva `@TypeAlias("AL_TUTOR")` / 
 | Operación | Documentos afectados | Transacción |
 |---|---|---|
 | `confirmarServicio` | solicitud, propuestas, servicio, pago | sí |
-| `finalizarServicio` / `cerrarAutomaticamente` | servicio, pago, perfil del tutor | sí (una por servicio) |
+| `finalizarServicio` / `cerrarAutomaticamente` | servicio, pago, perfil del tutor | sí (una por servicio; con el gestor no-op se compensa a mano) |
+| `moderarMensaje` / `moderarResena` | mensaje o reseña, reporte, sanción, usuario | sí |
 | `radicarReporte` | reporte, servicio, pago | sí (las evidencias se suben antes, fuera de la transacción) |
 | `resolverReporte` | reporte, pago, sanción, usuario | sí |
 | Subidas y descargas GridFS | archivos.* | **nunca** dentro de `@Transactional` |

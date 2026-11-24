@@ -75,6 +75,53 @@ public class ServicioPagos {
         return pago;
     }
 
+    /**
+     * Libera los fondos al tutor al finalizar el servicio: liquida con la comisión congelada del servicio (R12,
+     * HALF_UP a pesos enteros) y deja el pago LIBERADO. Acepta un pago RETENIDO o CONGELADO (resolución de un reporte
+     * a favor del tutor); en cualquier otro estado, 409. {@code actorId} es nulo cuando actúa el sistema.
+     */
+    public Pago liberarPago(ServicioTutoria servicio, String actorId, Instant ahora) {
+        Pago pago = exigirPago(servicio.getId());
+        pago.liberar(servicio.getComisionPct(), ahora);
+        pago = pagos.save(pago);
+        auditoria.registrarAccion(actorId, "PAGO_LIBERADO", "pago:" + pago.getId(), detalle(servicio, pago));
+        return pago;
+    }
+
+    /** Congela un pago RETENIDO mientras se revisa un reporte (409 en otro estado). */
+    public Pago congelarPago(String servicioId, String actorId, Instant ahora) {
+        Pago pago = exigirPago(servicioId);
+        pago.congelar(ahora);
+        pago = pagos.save(pago);
+        auditoria.registrarAccion(actorId, "PAGO_CONGELADO", "pago:" + pago.getId(), mapa("servicioId", servicioId));
+        return pago;
+    }
+
+    /** Devuelve al estudiante el monto completo, sin comisión, de un pago CONGELADO (409 en otro estado). */
+    public Pago reembolsarPago(String servicioId, String actorId, Instant ahora) {
+        Pago pago = exigirPago(servicioId);
+        pago.reembolsar(ahora);
+        pago = pagos.save(pago);
+        auditoria.registrarAccion(actorId, "PAGO_REEMBOLSADO", "pago:" + pago.getId(),
+                mapa("servicioId", servicioId, "montoCOP", texto(pago.getMontoRetenidoCOP())));
+        return pago;
+    }
+
+    private Pago exigirPago(String servicioId) {
+        return pagos.findByServicioId(servicioId).orElseThrow(() -> new ExcepcionNegocio("PAGO_NO_ENCONTRADO",
+                "El servicio no tiene un pago registrado", HttpStatus.CONFLICT));
+    }
+
+    private static Map<String, Object> mapa(Object... pares) {
+        Map<String, Object> mapa = new LinkedHashMap<>();
+        for (int i = 0; i + 1 < pares.length; i += 2) {
+            if (pares[i + 1] != null) {
+                mapa.put((String) pares[i], pares[i + 1]);
+            }
+        }
+        return mapa;
+    }
+
     /** Elimina un pago ya guardado (compensación si la confirmación falla después de retener). */
     public void descartarPago(Pago pago) {
         try {

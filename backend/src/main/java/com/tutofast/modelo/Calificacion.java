@@ -9,6 +9,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.http.HttpStatus;
 
 import com.tutofast.excepcion.ExcepcionNegocio;
 
@@ -39,6 +40,14 @@ public abstract class Calificacion {
     private Instant fechaEmision;
     private Instant fechaLimite;
     private boolean visible;
+    /** Reporte de la reseña por parte de su destinatario (moderación del administrador). */
+    private boolean reportada;
+    private String motivoReporte;
+    private String reportadaPorId;
+    private Instant fechaReporte;
+    /** Una reseña ocultada por un administrador no vuelve a mostrarse ni cuenta para el promedio. */
+    private boolean ocultaPorModeracion;
+    private Moderacion moderacion;
 
     protected Calificacion(TipoCalificacion tipo) {
         this.tipo = tipo;
@@ -58,7 +67,47 @@ public abstract class Calificacion {
 
     /** Se revela cuando ambas partes calificaron o venció el plazo (HU-09). */
     public void hacerVisible() {
-        this.visible = true;
+        if (!ocultaPorModeracion) {
+            this.visible = true;
+        }
+    }
+
+    /** El destinatario reporta una reseña ya publicada (una sola vez). */
+    public void reportar(String motivo, String reportanteId, Instant ahora) {
+        if (!visible) {
+            throw new ExcepcionNegocio("RESENA_NO_PUBLICADA", "Solo se pueden reportar reseñas ya publicadas",
+                    HttpStatus.CONFLICT);
+        }
+        if (reportada) {
+            throw new ExcepcionNegocio("RESENA_YA_REPORTADA", "La reseña ya fue reportada", HttpStatus.CONFLICT);
+        }
+        if (motivo == null || motivo.isBlank()) {
+            throw new ExcepcionNegocio("El motivo del reporte es obligatorio");
+        }
+        this.reportada = true;
+        this.motivoReporte = motivo.strip();
+        this.reportadaPorId = reportanteId;
+        this.fechaReporte = ahora;
+    }
+
+    /** Comprueba, sin cambiar nada, que la reseña tenga un reporte pendiente (se resuelve una sola vez). */
+    public void exigirModerable() {
+        if (!reportada) {
+            throw new ExcepcionNegocio("RESENA_NO_REPORTADA", "La reseña no tiene un reporte pendiente", HttpStatus.CONFLICT);
+        }
+        if (moderacion != null) {
+            throw new ExcepcionNegocio("RESENA_YA_MODERADA", "El reporte de esta reseña ya fue resuelto", HttpStatus.CONFLICT);
+        }
+    }
+
+    /** Resolución del administrador: confirmar la infracción oculta la reseña de forma definitiva. */
+    public void moderar(Moderacion resultado) {
+        exigirModerable();
+        this.moderacion = resultado;
+        if (resultado.confirmaInfraccion()) {
+            this.ocultaPorModeracion = true;
+            this.visible = false;
+        }
     }
 
     protected static BigDecimal promediar(int... criterios) {
@@ -92,6 +141,18 @@ public abstract class Calificacion {
     public void setFechaEmision(Instant fechaEmision) { this.fechaEmision = fechaEmision; }
     public Instant getFechaLimite() { return fechaLimite; }
     public void setFechaLimite(Instant fechaLimite) { this.fechaLimite = fechaLimite; }
+    public boolean isReportada() { return reportada; }
+    public void setReportada(boolean reportada) { this.reportada = reportada; }
+    public String getMotivoReporte() { return motivoReporte; }
+    public void setMotivoReporte(String motivoReporte) { this.motivoReporte = motivoReporte; }
+    public String getReportadaPorId() { return reportadaPorId; }
+    public void setReportadaPorId(String reportadaPorId) { this.reportadaPorId = reportadaPorId; }
+    public Instant getFechaReporte() { return fechaReporte; }
+    public void setFechaReporte(Instant fechaReporte) { this.fechaReporte = fechaReporte; }
+    public boolean isOcultaPorModeracion() { return ocultaPorModeracion; }
+    public void setOcultaPorModeracion(boolean ocultaPorModeracion) { this.ocultaPorModeracion = ocultaPorModeracion; }
+    public Moderacion getModeracion() { return moderacion; }
+    public void setModeracion(Moderacion moderacion) { this.moderacion = moderacion; }
     public boolean isVisible() { return visible; }
     public void setVisible(boolean visible) { this.visible = visible; }
 }

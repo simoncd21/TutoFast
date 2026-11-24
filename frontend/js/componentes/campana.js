@@ -26,8 +26,9 @@ function formatearFecha(iso) {
     : fecha.toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-// Solo se navega a páginas relativas del propio sitio (por ejemplo "perfil.html#soportes").
-const ENLACE_SEGURO = /^[A-Za-z0-9_-]+\.html(#[A-Za-z0-9_-]*)?$/;
+// Solo se navega a páginas relativas del propio sitio, con parámetros y ancla opcionales
+// (por ejemplo "perfil.html#soportes" o "negociacion.html?id=6741a0c1e4b0a1b2c3d4e401").
+const ENLACE_SEGURO = /^[A-Za-z0-9_-]+\.html(\?[A-Za-z0-9_=&%.-]*)?(#[A-Za-z0-9_-]*)?$/;
 
 /** Crea el <li> de una notificación. `alMarcar` se invoca (sin esperar) cuando se marca como leída al activarla. */
 export function crearElementoNotificacion(n, alMarcar) {

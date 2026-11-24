@@ -40,6 +40,8 @@ public final class RepositorioUsuarioEnMemoria {
                 .anyMatch(u -> u.getDocumento().equals(inv.getArgument(0))));
         when(repo.existsByRolesContaining(any(Rol.class))).thenAnswer(inv -> almacen.values().stream()
                 .anyMatch(u -> u.getRoles().contains(inv.<Rol>getArgument(0))));
+        when(repo.findByRolesContaining(any(Rol.class))).thenAnswer(inv -> almacen.values().stream()
+                .filter(u -> u.getRoles().contains(inv.<Rol>getArgument(0))).toList());
         when(repo.findByPerfilTutorSoportesRutaArchivo(anyString())).thenAnswer(inv -> almacen.values().stream()
                 .filter(u -> u.getPerfilTutor() != null && u.getPerfilTutor().getSoportes().stream()
                         .anyMatch(s -> inv.getArgument(0).equals(s.getRutaArchivo())))

@@ -48,13 +48,13 @@
 | SolicitudControlador | `/api/solicitudes` | ServicioSolicitudes |
 | PropuestaControlador | `/api/solicitudes/{id}/propuestas`, `/api/propuestas` | ServicioPropuestas |
 | NegociacionControlador | `/api/solicitudes/{id}/confirmar`, `/api/servicios` | ServicioNegociacion |
-| PagoControlador | `/api/pagos` | ServicioPagos *(el cierre automático, con ServicioNegociacion, llega en el módulo 09)* |
+| PagoControlador | `/api/pagos` | ServicioPagos, ServicioNegociacion (cierre automático) |
 | MensajeControlador | `/api/solicitudes/{id}/mensajes`, `/api/mensajes` | ServicioMensajeria |
 | ArchivoControlador | `/api/archivos` | ServicioArchivos |
-| CalificacionControlador | `/api/servicios/{id}/calificaciones` | ServicioReputacion |
+| CalificacionControlador | `/api/servicios/{id}/calificaciones`, `/api/calificaciones` | ServicioReputacion |
 | ReporteControlador | `/api/reportes`, `/api/sanciones` | ServicioReportes |
 | NotificacionControlador | `/api/notificaciones` | ServicioNotificaciones |
-| AdministracionControlador | `/api/admin` | ServicioIdentidad, ServicioReportes, ServicioMensajeria, ServicioAuditoria |
+| AdministracionControlador | `/api/admin` | ServicioIdentidad, ServicioReportes, ServicioMensajeria, ServicioReputacion, ServicioAuditoria |
 
 ---
 
@@ -294,7 +294,7 @@ Filtros (R07): `universidadId`, `facultadId`, `programaId`, `asignaturaId`, `tem
 ### `POST /api/solicitudes/{id}/confirmar` · E (dueño)
 Cuerpo: `{"tokenPagoSimulado":"tok_aprobar"}` — token **opaco** del simulador; obligatorio (400 `VALIDACION` si falta o está en blanco; máximo 64 caracteres). La plataforma nunca recibe, registra ni guarda datos de tarjeta: ni el token ni la respuesta ni la auditoría lo conservan. Con `tok_rechazar` (o cualquier token vacío) el simulador rechaza el pago.
 
-Una sola operación (`@Transactional` con Atlas; con el gestor no-op compensa a mano): verifica dueño y estado (TUTOR_SELECCIONADO con una propuesta ACEPTADA y el tutor activo) → lee la comisión vigente (`ServicioCatalogo.consultarComision`) → **reserva** el `ServicioTutoria` (CONFIRMADO, con precio, duración, modalidad y `comisionPct` congelados; el índice único `uk_servicio_solicitud` hace de cerrojo) → `IPasarelaPago.procesarPago` → crea el `Pago` (RETENIDO, con comisión y neto calculados con `BigDecimal`, HALF_UP a pesos enteros, guardados como `Decimal128`) → solicitud FORMALIZADA → descarta las demás propuestas (`PROPUESTA_DESCARTADA`) → auditoría y notificaciones. Si el pago se rechaza o algo falla, se elimina la reserva y la solicitud queda en TUTOR_SELECCIONADO, sin pago ni servicio. *(El cierre de los hilos de chat de los tutores no elegidos llega con el módulo 08.)*
+Una sola operación (`@Transactional` con Atlas; con el gestor no-op compensa a mano): verifica dueño y estado (TUTOR_SELECCIONADO con una propuesta ACEPTADA y el tutor activo) → lee la comisión vigente (`ServicioCatalogo.consultarComision`) → **reserva** el `ServicioTutoria` (CONFIRMADO, con precio, duración, modalidad y `comisionPct` congelados; el índice único `uk_servicio_solicitud` hace de cerrojo) → `IPasarelaPago.procesarPago` → crea el `Pago` (RETENIDO, con comisión y neto calculados con `BigDecimal`, HALF_UP a pesos enteros, guardados como `Decimal128`) → solicitud FORMALIZADA → descarta las demás propuestas (`PROPUESTA_DESCARTADA`) → auditoría y notificaciones. Si el pago se rechaza o algo falla, se elimina la reserva y la solicitud queda en TUTOR_SELECCIONADO, sin pago ni servicio. El cierre de los hilos de los tutores no elegidos lo hace `ServicioMensajeria.cerrarHilos` (módulo 08).
 
 200 `ServicioDTO`:
 ```json
@@ -326,8 +326,10 @@ Auditoría (sin el token): `SERVICIO_CONFIRMADO` (entidad `servicio:{id}`; solic
 | `GET /api/servicios/mios?estado=` | E, T | — | 200 `ServicioDTO[]` (como estudiante o como tutor, recientes primero); `estado` opcional (CONFIRMADO, EN_DESARROLLO, FINALIZADO, EN_REVISION, CANCELADO; otro valor → 400) |
 | `GET /api/servicios/{id}` | Part., AD | — | 200 `ServicioDTO`; 403 para cualquier otro usuario; 404 si no existe |
 | `PATCH /api/servicios/{id}/enlace` | T (del servicio) | `{"lugarOEnlace":"https://meet.example/abc"}` (obligatorio, hasta 300 caracteres) | solo en CONFIRMADO (409 `SERVICIO_NO_EDITABLE` si no); si el cuerpo trae `precioFinalCOP`, `duracion` o `modalidad` → 409 `SERVICIO_INMUTABLE` (inmutables tras la confirmación); 403 si no es el tutor del servicio. Notifica al estudiante y audita `SERVICIO_ENLACE_ACTUALIZADO` |
-| `POST /api/servicios/{id}/iniciar` | Part. | — | CONFIRMADO → EN_DESARROLLO; 409 `TRANSICION_INVALIDA` si no estaba CONFIRMADO; 403 a quien no participa; audita `SERVICIO_INICIADO`. *(El inicio automático por hora llega con la tarea programada del módulo 09.)* |
-| `POST /api/servicios/{id}/finalizar` *(módulo 09)* | E (del servicio) | — | EN_DESARROLLO → FINALIZADO; liquidación y liberación; 200 `LiquidacionDTO`; 409 "El servicio ya se encuentra finalizado y no requiere nuevas acciones"; 409 si está EN_REVISION |
+| `POST /api/servicios/{id}/iniciar` | Part. | — | CONFIRMADO → EN_DESARROLLO; 409 `TRANSICION_INVALIDA` si no estaba CONFIRMADO; 403 a quien no participa; audita `SERVICIO_INICIADO` (el inicio automático por hora se describe abajo) |
+| `POST /api/servicios/{id}/finalizar` | E (del servicio) | — | EN_DESARROLLO → FINALIZADO; libera el pago al tutor (comisión congelada del servicio, HALF_UP) y recalcula `serviciosCompletados`; 200 `LiquidacionDTO` con estado LIBERADO. 403 si no es el estudiante del servicio; 409 `SERVICIO_YA_FINALIZADO` ("El servicio ya se encuentra finalizado y no requiere nuevas acciones"); 409 `SERVICIO_EN_REVISION`; 409 `TRANSICION_INVALIDA` si no se inició; 409 `REPORTE_ABIERTO`; 409 `PAGO_NO_LIBERABLE` (pago no retenido). Si liberar el pago falla, el servicio vuelve a EN_DESARROLLO. Audita `SERVICIO_FINALIZADO` y `PAGO_LIBERADO`; notifica `SERVICIO_FINALIZADO`, `PAGO_LIBERADO` y `CALIFICACION_PENDIENTE` |
+
+**Inicio automático:** la tarea programada (cada minuto) pasa a EN_DESARROLLO los servicios CONFIRMADOS cuya `fechaHora` ya llegó, audita `SERVICIO_INICIADO_AUTOMATICO` (sistema) y avisa a ambos (`RECORDATORIO_SESION`). Además, cada hora se recuerda una sola vez cada sesión CONFIRMADA que empieza en menos de 24 h.
 
 ---
 
@@ -344,34 +346,43 @@ Auditoría (sin el token): `SERVICIO_CONFIRMADO` (entidad `servicio:{id}`; solic
 |---|---|---|
 | `GET /api/pagos/servicio/{servicioId}` | Part., AD | 200 `LiquidacionDTO` (con el servicio RETENIDO muestra la comisión y el neto que se liquidarán); 403 a otros usuarios; 404 si el servicio o el pago no existen |
 | `GET /api/pagos/mios` | E, T | 200 `LiquidacionDTO[]` (egresos del estudiante o ingresos netos del tutor; recientes primero) |
-| `POST /api/pagos/simular-cierre-automatico?ignorarPlazo=false` *(módulo 09)* | **AD únicamente** | 200 `CierreAutomaticoDTO` |
+| `POST /api/pagos/simular-cierre-automatico?ignorarPlazo=false` | **AD únicamente** | 200 `CierreAutomaticoDTO` |
 
 ### `POST /api/pagos/simular-cierre-automatico` · AD (demo)
 Ejecuta al momento la misma lógica que la tarea programada (`ServicioNegociacion.cerrarAutomaticamente`): busca servicios EN_DESARROLLO cuyo fin programado (`fechaHora + duracion`) más 24 h ya pasó y que no tienen reporte abierto; los finaliza y libera el pago. Con `ignorarPlazo=true` (solo para la demo) omite la espera de 24 h. Queda registrado en la auditoría como `CIERRE_AUTOMATICO_MANUAL`.
 ```json
-{ "revisados": 5, "cerrados": 3, "omitidosPorReporte": 1, "omitidosPorPlazo": 1, "serviciosCerrados": ["6741...401", "..."] }
+{ "revisados": 5, "cerrados": 3, "omitidosPorReporte": 1, "omitidosPorPlazo": 1, "fallidos": 0, "serviciosCerrados": ["6741...401", "..."] }
 ```
-Responde 403 a cualquier rol distinto de ADMINISTRADOR.
+Responde 403 a cualquier rol distinto de ADMINISTRADOR y 400 si `ignorarPlazo` no es booleano. Cada servicio se cierra en su propia transacción: uno que falle se cuenta en `fallidos` (queda EN_DESARROLLO y se reintenta) y no impide cerrar los demás. El cierre automático audita `SERVICIO_CERRADO_AUTOMATICAMENTE` (sistema) y la simulación además `CIERRE_AUTOMATICO_MANUAL`.
+
+**Tareas programadas** (`ProgramadorTareasConfig`, apagables con `tutofast.tareas.habilitadas=false`): cada minuto, inicio automático; cada 15 min, este cierre automático; cada hora, recordatorios de sesión, publicación de reseñas vencidas, recordatorios de calificación y fin de las suspensiones temporales vencidas.
 
 ---
 
 ## 11. Mensajería — `MensajeControlador`
 
-Hilo = `(solicitudId, tutorId)`. Participantes: el estudiante dueño y ese tutor (que debe tener o haber tenido una propuesta en la solicitud). El administrador solo puede leer. Tras la confirmación, los hilos de los tutores no elegidos quedan en solo lectura.
+Hilo = `(solicitudId, tutorId)`. Participantes: el estudiante dueño y ese tutor (que debe tener o haber tenido una propuesta en la solicitud). El administrador solo puede leer y moderar.
+
+**Cuándo un hilo es de solo lectura** (se puede leer y reportar, no escribir; escribir da 403 `NO_AUTORIZADO`): la solicitud está CANCELADA; el tutor no tiene ninguna propuesta activa (descartada por el estudiante, retirada o descartada al confirmar a otro tutor); o el servicio ya concluyó (FINALIZADO o CANCELADO). Si el tutor vuelve a proponer, el hilo se reabre. Al confirmar el servicio, cada hilo no elegido que tuvo conversación recibe un aviso del sistema (`sistema=true`, sin emisor) y se audita `HILO_CERRADO`.
 
 | Método y ruta | Rol | Parámetros / cuerpo | Respuesta |
 |---|---|---|---|
-| `GET /api/solicitudes/{id}/mensajes` | Part., AD | `tutorId` (obligatorio para el estudiante y el administrador), `desde` (ISO, exclusivo, opcional) | 200 `{"soloLectura":false,"mensajes":[MensajeDTO]}` ordenados ascendente |
-| `GET /api/solicitudes/{id}/hilos` | E (dueño), AD | — | 200 `[{"tutorId","tutorNombre","ultimoMensaje","noLeidos"}]` |
-| `POST /api/solicitudes/{id}/mensajes` | Part. | multipart `datos={"tutorId","contenido"}`, `archivo?` | 201 `MensajeDTO`; 403 si el hilo es de solo lectura; 415 si el tipo de archivo no está permitido ("Tipo de archivo no permitido. Solo se admiten formatos seguros (PDF, PNG, JPG, DOCX)") |
-| `POST /api/mensajes/{id}/reportar` | Part. (receptor) | `{"motivo":"CONDUCTA_ABUSIVA","detalle":"..."}` | 200; `reportado=true`; se notifica al administrador; el mensaje sigue siendo inmutable |
+| `GET /api/solicitudes/{id}/mensajes` | Part., AD | `tutorId` (obligatorio para el estudiante y el administrador; el tutor usa el suyo), `desde` (ISO, exclusivo, opcional) | 200 `{"soloLectura":false,"motivoSoloLectura":null,"mensajes":[MensajeDTO]}` ascendentes. Sin `desde`: los últimos 100; con `desde`: los 100 más antiguos posteriores |
+| `GET /api/solicitudes/{id}/hilos` | E (dueño), AD | — | 200 `[{"tutorId","tutorNombre","ultimoMensaje","ultimaActividad","noLeidos","soloLectura"}]` (uno por tutor con propuesta, el más reciente primero) |
+| `POST /api/solicitudes/{id}/mensajes` | E, T (Part.) | multipart `datos={"tutorId","contenido"}` + `archivo?`, o JSON `{"tutorId","contenido"}` sin adjunto | 201 `MensajeDTO` |
+| `POST /api/mensajes/{id}/reportar` | Part. (receptor) | `{"motivo":"CONDUCTA_ABUSIVA","detalle":"..."}` | 200 `MensajeDTO` con `reportado=true`; el contenido no cambia |
 
-`MensajeDTO`: `{"id","emisorId","emisorNombre","contenido","marcaTemporal","reportado","archivo":{"archivoId","nombre","tipo","tamanoMB"}|null}`.
+Errores del envío: 400 (vacío sin adjunto, más de 2000 caracteres, estudiante sin `tutorId`), 403 (tercero, administrador, tutor sin propuesta, hilo de solo lectura, cuenta inactiva), 404 (solicitud o tutor sin hilo), 413/415 (adjunto: "Tipo de archivo no permitido. Solo se admiten formatos seguros (PDF, PNG, JPG, DOCX)") y **422 `CONTACTO_EXTERNO`**.
 
-**Contrato de polling:** el cliente llama cada 4 s con `desde=<marcaTemporal del último mensaje recibido>`. El servidor devuelve solo los mensajes más nuevos (como máximo 100). Para el contador de no leídos no hay endpoint aparte: se usa `/hilos`.
+**Filtro de contacto externo** (`FiltroContactoExterno`, también aplicado a los comentarios de las reseñas): se rechazan teléfonos (10 o más dígitos, aunque estén separados por espacios, puntos o guiones, o 7+ tras «cel/tel/llámame…»), correos (incluido «arroba/punto»), usuarios `@red`, enlaces externos (se permiten `meet.google.com`, `zoom.us` y `teams.microsoft.com`), WhatsApp/Telegram/Instagram/Facebook, y propuestas de pago directo («por fuera de la plataforma», Nequi, Daviplata, «sin comisión»…). No se confunden precios (`1.500.000`), fechas ni horas. Un mensaje bloqueado no se guarda; se audita `MENSAJE_BLOQUEADO` (con el motivo, nunca el contenido).
+
+**Reportar** (`REPORTAR_MENSAJE`): solo el receptor (no el emisor, no un tercero, no el administrador; los avisos del sistema no se reportan). Motivos: `CONDUCTA_ABUSIVA`, `ACOSO`, `CONTACTO_EXTERNO`, `FRAUDE_ACADEMICO`, `SPAM`, `OTRO`. Segundo reporte → 409 `MENSAJE_YA_REPORTADO`. Se notifica (`REPORTE_RECIBIDO`) a los administradores. Se puede reportar aunque el hilo sea de solo lectura.
+
+`MensajeDTO`: `{"id","emisorId","emisorNombre","contenido","marcaTemporal","reportado","sistema","retirado","archivo":{"archivoId","nombre","tipo","tamanoMB"}|null}`. `retirado=true` (infracción confirmada por un administrador): a los participantes les llega `contenido` = «[Mensaje retirado por la moderación de TutoFast]» y sin `archivo`; el administrador ve el original.
+
+**Contrato de polling:** el cliente llama cada 4 s con `desde=<marcaTemporal del último mensaje recibido>` (menos 1 ms, porque Mongo guarda milisegundos; el cliente descarta repetidos por `id`), se pausa si la pestaña está oculta y retrocede exponencialmente (máx. 30 s) si falla. Al consultar, los mensajes de la otra parte quedan leídos; los no leídos se ven en `/hilos`. Notificación `NUEVO_MENSAJE` (enlace `solicitudes.html?id=…&tutorId=…`): solo en el primer mensaje de una racha o tras 10 minutos de pausa.
 
 ---
-
 ## 12. Archivos — `ArchivoControlador`
 
 ### `GET /api/archivos/{id}` · A (con control de acceso por contexto)
@@ -400,6 +411,18 @@ Tutor → CalificacionAlEstudiante:
 200 `{"mia":CalificacionDTO|null,"contraparte":CalificacionDTO|null,"fechaLimite":"...","puedeCalificar":true}`. La calificación de la contraparte solo se muestra cuando ya es visible.
 
 Las reseñas públicas se consultan en `GET /api/usuarios/{id}/resenas` (sección 4).
+
+### Notas de implementación (módulo 09)
+- Los criterios son obligatorios según el tipo (si faltan: 400 `VALIDACION` con la lista; fuera de 1–5: 400 por validación del cuerpo). `comentario` es opcional (máx. 500) y no admite contactos externos (422 `CONTACTO_EXTERNO`). El `promedio` de cada calificación es la media de sus criterios (2 decimales HALF_UP).
+- Plazo: `fechaLimite = fechaFinalizacion + 14 días` (422 `PLAZO_VENCIDO` después). Las calificaciones quedan ocultas hasta que ambas partes califican o vence el plazo (la tarea horaria publica las vencidas y avisa con `RESENA_DISPONIBLE`). A los 7 días del cierre se recuerda una vez a quien no ha calificado (`CALIFICACION_PENDIENTE`).
+- `promedioCalificacion` del tutor, `serviciosCompletados`, `indicadorConfiabilidad` y `calificacionesRecibidas` del estudiante se **recalculan desde los datos** (solo calificaciones visibles y no ocultadas; servicios FINALIZADOS), no se incrementan: una interrupción se corrige sola en el siguiente recálculo.
+- `GET /api/servicios/{id}/calificaciones` es solo para participantes (403 al administrador).
+
+### `POST /api/calificaciones/{id}/reportar` · E o T (reseñado)
+Cuerpo `{"motivo":"..."}` (obligatorio, máx. 500). Solo la persona reseñada, y solo si la reseña ya es visible: 403 al resto; 409 `RESENA_NO_PUBLICADA` o `RESENA_YA_REPORTADA`. 200 `CalificacionDTO`. Se avisa a los administradores y se audita `REPORTAR_RESENA`.
+
+### Moderación de reseñas (AD)
+`GET /api/admin/resenas-reportadas` → `[{"calificacion","autor":{id,nombre},"destinatario","motivoReporte","reportante","fechaReporte","moderacion"}]` (pendientes). `POST /api/admin/resenas-reportadas/{calificacionId}/moderar` con el cuerpo de moderación (sección 16): `DESESTIMAR` la deja publicada; `CONFIRMAR_INFRACCION` la oculta de forma definitiva (no vuelve a publicarse ni cuenta en el promedio) y puede sancionar a su autor. 409 `RESENA_NO_REPORTADA` / `RESENA_YA_MODERADA`. Audita `MODERAR_RESENA`.
 
 ---
 
@@ -437,7 +460,7 @@ Las reseñas públicas se consultan en `GET /api/usuarios/{id}/resenas` (secció
 
 Parámetros de `GET /api/notificaciones`: `soloNoLeidas` (false), `pagina` (0), `tamano` (20, máximo 100).
 
-`NotificacionDTO`: `{"id","tipo","titulo","mensaje","enlace","leida","fecha"}`. Tipos: `NUEVA_PROPUESTA`, `CONTRAOFERTA`, `PROPUESTA_ACEPTADA`, `PROPUESTA_DESCARTADA`, `SERVICIO_CONFIRMADO`, `NUEVO_MENSAJE`, `RECORDATORIO_SESION`, `SERVICIO_FINALIZADO`, `PAGO_LIBERADO`, `CALIFICACION_PENDIENTE`, `REPORTE_RECIBIDO`, `REPORTE_RESUELTO`, `SANCION_APLICADA`, `APELACION_RESUELTA`, `SOPORTE_APROBADO`, `SOPORTE_RECHAZADO`.
+`NotificacionDTO`: `{"id","tipo","titulo","mensaje","enlace","leida","fecha"}`. Tipos: `NUEVA_PROPUESTA`, `CONTRAOFERTA`, `PROPUESTA_ACEPTADA`, `PROPUESTA_DESCARTADA`, `SERVICIO_CONFIRMADO`, `NUEVO_MENSAJE`, `RECORDATORIO_SESION`, `SERVICIO_FINALIZADO`, `PAGO_LIBERADO`, `CALIFICACION_PENDIENTE`, `RESENA_DISPONIBLE`, `REPORTE_RECIBIDO`, `REPORTE_RESUELTO`, `SANCION_APLICADA`, `APELACION_RESUELTA`, `SOPORTE_APROBADO`, `SOPORTE_RECHAZADO`.
 
 ---
 
@@ -475,6 +498,19 @@ Cola de verificación ordenada por `prioridad` (ALTA primero) y luego por `fecha
 - 200 `ReporteDTO` con `resolucion`.
 
 `RegistroAuditoriaDTO`: `{"id","usuarioId","usuarioNombre","accion","entidadAfectada","fecha","detalle"}`.
+### 16.1 Moderación de mensajes y reseñas (módulo 08/09)
+`GET /api/admin/mensajes-reportados?incluirModerados=false` → `[{"mensaje":MensajeDTO (original),"solicitudId","tutorId","tutorNombre","motivoReporte","detalleReporte","reportante":{id,nombre},"fechaReporte","moderacion":ModeracionDTO|null}]`.
+
+`POST /api/admin/mensajes-reportados/{mensajeId}/moderar` y `POST /api/admin/resenas-reportadas/{id}/moderar` comparten cuerpo:
+```json
+{ "decision": "CONFIRMAR_INFRACCION", "observacion": "Lenguaje ofensivo",
+  "sancion": { "tipo": "SUSPENSION_TEMPORAL", "inicio": null, "fin": "2026-12-21T00:00:00Z" } }
+```
+- `decision`: `DESESTIMAR` | `CONFIRMAR_INFRACCION`. `observacion` ≤ 500. `sancion` es opcional y solo con `CONFIRMAR_INFRACCION` (si no: 400). `tipo`: `ADVERTENCIA` | `SUSPENSION_TEMPORAL` (exige `fin` futuro; `inicio` no puede ser posterior a ahora) | `BLOQUEO_PERMANENTE` (el `fin` se ignora).
+- Con sanción se radica y resuelve un reporte (a favor del reportante; tipo según el motivo) que respalda la `Sancion` y permite apelarla; la sanción recae sobre quien escribió el mensaje o la reseña (nunca sobre un administrador: 422). Suspensión → cuenta SUSPENDIDA (la tarea horaria la reactiva al vencer, salvo otra sanción vigente); bloqueo → BLOQUEADA. Se notifica `SANCION_APLICADA` y `REPORTE_RESUELTO`.
+- Se validan estado y sanción antes de cambiar nada. 409 si ya se resolvió o no está reportado. Si algo falla se compensan el reporte y la sanción creados.
+- 200 con el mismo elemento de la cola (`moderacion` = `{"decision","observacion","moderadoPor","fecha","sancionId"}`). Audita `MODERAR_MENSAJE` / `MODERAR_RESENA` y `SANCION_APLICADA`.
+
 
 **Notas de implementación (módulo 05, endpoints ya disponibles)**
 - `GET /api/admin/soportes?estado=` (por defecto `EN_REVISION`): un elemento por soporte. `motivoPrioridad` es `null` cuando la prioridad es `NORMAL`; el orden es prioridad ALTA primero y luego `fechaEnvio` ascendente.
@@ -482,7 +518,7 @@ Cola de verificación ordenada por `prioridad` (ALTA primero) y luego por `fecha
 - Nivel resultante: `VERIFICADO` si el tutor tiene algún soporte aprobado; si no, `EN_REVISION` mientras le quede alguno pendiente y `NO_VERIFICADO` en otro caso. Notificaciones `SOPORTE_APROBADO` / `SOPORTE_RECHAZADO` (con el motivo) y auditoría `APROBAR_SOPORTE` / `RECHAZAR_SOPORTE`.
 - `GET /api/admin/usuarios?rol=&estado=&q=&pagina=&tamano=`: `Pagina<UsuarioAdminDTO>` con `{"id","nombre","correo","roles","estadoCuenta","fechaRegistro","nivelVerificacion"}` (`q` busca en nombre y correo; más recientes primero; tamaño máximo 100).
 - `PATCH /api/admin/usuarios/{id}/estado`: `motivo` obligatorio para `SUSPENDIDA` y `BLOQUEADA`; no se puede actuar sobre la propia cuenta ni sobre otro administrador (422). Auditoría `CAMBIAR_ESTADO_CUENTA`. Una cuenta no activa deja de poder usar el token en la siguiente petición (403).
-- `GET /api/admin/auditoria`: `desde` y `hasta` son instantes ISO-8601 (`2026-12-01T00:00:00Z`); `usuarioNombre` es «Sistema» cuando `usuarioId` es nulo. Los endpoints de reportes, sanciones y mensajes reportados de esta tabla llegan en módulos posteriores.
+- `GET /api/admin/auditoria`: `desde` y `hasta` son instantes ISO-8601 (`2026-12-01T00:00:00Z`); `usuarioNombre` es «Sistema» cuando `usuarioId` es nulo. Los endpoints de reportes, sanciones y apelaciones de esta tabla llegan en el módulo 10.
 
 ---
 
@@ -559,4 +595,8 @@ Cola de verificación ordenada por `prioridad` (ALTA primero) y luego por `fecha
 | 74 | POST | /api/admin/reportes/{id}/resolver | AD |
 | 75 | POST | /api/admin/sanciones/{id}/apelaciones/{a}/resolver | AD |
 | 76 | GET | /api/admin/mensajes-reportados | AD |
+| 76b | POST | /api/admin/mensajes-reportados/{id}/moderar | AD |
+| 76c | GET | /api/admin/resenas-reportadas | AD |
+| 76d | POST | /api/admin/resenas-reportadas/{id}/moderar | AD |
+| 58b | POST | /api/calificaciones/{id}/reportar | E, T |
 | 77 | GET | /api/admin/auditoria | AD |

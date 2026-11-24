@@ -6,6 +6,7 @@ import { api, ErrorApi, descargarArchivo } from '../servicios/api.js';
 import {
   listarUniversidades, listarFacultades, listarProgramas, listarAsignaturas, llenarSelect,
 } from '../servicios/catalogo.js';
+import { montarChat } from '../componentes/chat.js';
 import { exigirSesion } from '../sesion.js';
 
 iniciarEncabezado();
@@ -116,13 +117,15 @@ function pintarTabla(tabla, columnas, filas, vacio) {
 }
 
 // ---------------------------------------------------------------- pestañas
-const PESTANAS = ['catalogos', 'comision', 'verificacion', 'usuarios', 'auditoria'];
+const PESTANAS = ['catalogos', 'comision', 'verificacion', 'usuarios', 'moderacion', 'cierre', 'auditoria'];
 const cargadas = new Set();
 const cargadores = {
   catalogos: () => cargarUniversidades(),
   comision: () => cargarComision(),
   verificacion: () => cargarCola(),
   usuarios: () => cargarUsuarios(0),
+  moderacion: () => Promise.all([cargarMensajesReportados(), cargarResenasReportadas()]),
+  cierre: () => {},
   auditoria: () => cargarAuditoria(0),
 };
 
@@ -574,14 +577,202 @@ formFiltrosAuditoria.addEventListener('submit', (ev) => { ev.preventDefault(); c
 document.getElementById('auditoria-anterior').addEventListener('click', () => cargarAuditoria(paginaAuditoria - 1));
 document.getElementById('auditoria-siguiente').addEventListener('click', () => cargarAuditoria(paginaAuditoria + 1));
 
+// ---------------------------------------------------------------- moderación (mensajes y reseñas reportados)
+const MOTIVO_MENSAJE = {
+  CONDUCTA_ABUSIVA: 'Conducta abusiva', ACOSO: 'Acoso', CONTACTO_EXTERNO: 'Contacto o pago fuera de la plataforma',
+  FRAUDE_ACADEMICO: 'Fraude académico', SPAM: 'Spam', OTRO: 'Otro',
+};
+const TIPOS_SANCION = [
+  ['', 'Sin sanción'], ['ADVERTENCIA', 'Advertencia'], ['SUSPENSION_TEMPORAL', 'Suspensión temporal'],
+  ['BLOQUEO_PERMANENTE', 'Bloqueo permanente'],
+];
+let adminId = null;
+const moderacionAlResolver = [];
+
+/**
+ * Formulario de decisión: observación, sanción opcional (solo al confirmar la infracción) y los dos botones.
+ * `enviar(cuerpo)` hace la llamada; al terminar bien se recargan las dos colas.
+ */
+function formularioDecision(enviar, textoConfirmar, objetivoSancion) {
+  const form = el('form', 'moderacion__form');
+  form.noValidate = true;
+  const obs = el('textarea');
+  obs.rows = 2;
+  obs.maxLength = 500;
+  obs.placeholder = 'Observación de la decisión (opcional)';
+  obs.setAttribute('aria-label', 'Observación de la decisión');
+  const sancion = document.createElement('select');
+  sancion.setAttribute('aria-label', `Sanción para ${objetivoSancion}`);
+  TIPOS_SANCION.forEach(([v, t]) => sancion.appendChild(new Option(v ? `Sancionar a ${objetivoSancion}: ${t.toLowerCase()}` : 'Sin sanción', v)));
+  const fin = el('input');
+  fin.type = 'date';
+  fin.hidden = true;
+  fin.setAttribute('aria-label', 'Último día de la suspensión');
+  sancion.addEventListener('change', () => { fin.hidden = sancion.value !== 'SUSPENSION_TEMPORAL'; });
+  const desestimar = el('button', 'btn btn--borde btn--pequeno', 'Desestimar reporte');
+  desestimar.type = 'button';
+  const confirmar = el('button', 'btn btn--peligro btn--pequeno', textoConfirmar);
+  confirmar.type = 'button';
+  const acciones = el('div', 'moderacion__acciones');
+  acciones.append(desestimar, confirmar);
+  form.append(obs, sancion, fin, acciones);
+
+  const decidir = async (decision) => {
+    const cuerpo = { decision, observacion: obs.value.trim() || undefined };
+    if (decision === 'CONFIRMAR_INFRACCION' && sancion.value) {
+      cuerpo.sancion = { tipo: sancion.value };
+      if (sancion.value === 'SUSPENSION_TEMPORAL') {
+        const finIso = fin.value ? new Date(`${fin.value}T23:59:59Z`) : null;
+        if (!finIso || finIso <= new Date()) {
+          toastError('Indica un último día de suspensión posterior a hoy');
+          fin.focus();
+          return;
+        }
+        cuerpo.sancion.fin = finIso.toISOString();
+      }
+    }
+    desestimar.disabled = true;
+    confirmar.disabled = true;
+    try {
+      await enviar(cuerpo);
+      exito(decision === 'DESESTIMAR' ? 'Reporte desestimado' : 'Infracción confirmada');
+      await Promise.all([cargarMensajesReportados(), cargarResenasReportadas()]);
+    } catch (e) {
+      toastError(e.message ?? 'No se pudo registrar la decisión');
+      desestimar.disabled = false;
+      confirmar.disabled = false;
+    }
+  };
+  desestimar.addEventListener('click', () => decidir('DESESTIMAR'));
+  confirmar.addEventListener('click', () => decidir('CONFIRMAR_INFRACCION'));
+  return form;
+}
+
+function itemMensaje(r) {
+  const m = r.mensaje;
+  const item = el('article', 'moderacion__item');
+  const cab = el('div', 'cola__cabecera');
+  const fila = el('div', 'fila-badges');
+  fila.append(badge(MOTIVO_MENSAJE[r.motivoReporte] ?? r.motivoReporte, 'badge--advertencia'),
+    el('span', 'texto-suave', `Reportado por ${r.reportante?.nombre ?? '—'} · ${fecha(r.fechaReporte)}`));
+  cab.append(el('strong', '', `Mensaje de ${m.emisorNombre ?? '—'}`), fila);
+  item.append(cab,
+    el('p', 'texto-suave', `Conversación del hilo con ${r.tutorNombre ?? 'el tutor'} · enviado ${fecha(m.marcaTemporal)}`),
+    el('p', 'moderacion__cita', m.contenido ?? '[Sin texto: solo adjunto]'));
+  if (m.archivo) {
+    item.appendChild(boton(`📎 ${m.archivo.nombre}`, 'btn btn--borde btn--pequeno', async () => {
+      try { await descargarArchivo(m.archivo.archivoId, m.archivo.nombre); } catch (e) { toastError(e.message); }
+    }));
+  }
+  if (r.detalleReporte) item.appendChild(el('p', '', `Detalle del reporte: ${r.detalleReporte}`));
+
+  const zonaChat = el('div');
+  zonaChat.hidden = true;
+  let chat = null;
+  const ver = boton('Ver la conversación', 'btn btn--borde btn--pequeno', () => {
+    zonaChat.hidden = !zonaChat.hidden;
+    chat?.destruir();
+    chat = null;
+    if (!zonaChat.hidden) {
+      chat = montarChat(zonaChat, { solicitudId: r.solicitudId, tutorId: r.tutorId, usuarioId: adminId, rol: 'ADMINISTRADOR' });
+    }
+  });
+  item.append(ver, zonaChat);
+  if (r.moderacion) {
+    item.appendChild(badge(`Resuelto: ${r.moderacion.decision === 'DESESTIMAR' ? 'desestimado' : 'infracción confirmada'}`, 'badge--exito'));
+  } else {
+    item.appendChild(formularioDecision(
+      (cuerpo) => api.post(`/api/admin/mensajes-reportados/${encodeURIComponent(m.id)}/moderar`, cuerpo),
+      'Confirmar infracción', m.emisorNombre ?? 'el autor'));
+  }
+  return item;
+}
+
+function itemResena(r) {
+  const c = r.calificacion;
+  const item = el('article', 'moderacion__item');
+  const cab = el('div', 'cola__cabecera');
+  cab.append(el('strong', '', `Reseña de ${r.autor?.nombre ?? '—'} a ${r.destinatario?.nombre ?? '—'}`),
+    badge(`Promedio ${Number(c.promedio).toLocaleString('es-CO', { minimumFractionDigits: 2 })}`, 'badge--info'));
+  item.append(cab,
+    el('p', 'texto-suave', `Reportada por ${r.reportante?.nombre ?? '—'} · ${fecha(r.fechaReporte)}`),
+    el('p', 'moderacion__cita', c.comentario ?? '[Sin comentario]'),
+    el('p', '', `Motivo del reporte: ${r.motivoReporte}`));
+  item.appendChild(formularioDecision(
+    (cuerpo) => api.post(`/api/admin/resenas-reportadas/${encodeURIComponent(c.id)}/moderar`, cuerpo),
+    'Ocultar reseña', r.autor?.nombre ?? 'el autor'));
+  return item;
+}
+
+async function cargarMensajesReportados() {
+  const lista = document.getElementById('mensajes-reportados');
+  try {
+    const datos = await api.get('/api/admin/mensajes-reportados');
+    lista.replaceChildren(...datos.map(itemMensaje));
+    document.getElementById('mensajes-vacio').hidden = datos.length > 0;
+  } catch (e) {
+    toastError(e.message ?? 'No se pudieron cargar los mensajes reportados');
+  }
+}
+
+async function cargarResenasReportadas() {
+  const lista = document.getElementById('resenas-reportadas');
+  try {
+    const datos = await api.get('/api/admin/resenas-reportadas');
+    lista.replaceChildren(...datos.map(itemResena));
+    document.getElementById('resenas-vacio').hidden = datos.length > 0;
+  } catch (e) {
+    toastError(e.message ?? 'No se pudieron cargar las reseñas reportadas');
+  }
+}
+
+document.getElementById('moderacion-recargar').addEventListener('click',
+  () => Promise.all([cargarMensajesReportados(), cargarResenasReportadas()]));
+
+// ---------------------------------------------------------------- cierre automático (demostración)
+const formCierre = document.getElementById('form-cierre');
+formCierre.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const botonCierre = document.getElementById('cierre-ejecutar');
+  const ignorar = document.getElementById('cierre-ignorar-plazo').checked;
+  const resultado = document.getElementById('cierre-resultado');
+  await ocupado(botonCierre, async () => {
+    try {
+      const r = await api.post(`/api/pagos/simular-cierre-automatico?ignorarPlazo=${ignorar}`);
+      const resumen = el('ul');
+      [`Servicios en desarrollo revisados: ${r.revisados}`, `Cerrados y liquidados: ${r.cerrados}`,
+        `Omitidos por tener un reporte abierto: ${r.omitidosPorReporte}`,
+        `Omitidos porque aún no cumplen 24 h: ${r.omitidosPorPlazo}`, `Con error (se reintentan solos): ${r.fallidos}`,
+      ].forEach((t) => resumen.appendChild(el('li', '', t)));
+      const nodos = [el('h3', '', 'Resultado'), resumen];
+      if (r.serviciosCerrados?.length) {
+        const enlaces = el('div', 'fila-badges');
+        r.serviciosCerrados.forEach((id) => {
+          const a = el('a', 'btn btn--borde btn--pequeno', `Servicio ${id.slice(-6)}`);
+          a.href = `negociacion.html?id=${encodeURIComponent(id)}`;
+          enlaces.appendChild(a);
+        });
+        nodos.push(enlaces);
+      }
+      resultado.replaceChildren(...nodos);
+      resultado.hidden = false;
+      exito(r.cerrados ? `${r.cerrados} servicio(s) cerrado(s)` : 'No había servicios para cerrar');
+    } catch (err) {
+      toastError(err.message ?? 'No se pudo ejecutar el cierre automático');
+    }
+  });
+});
+
 // ---------------------------------------------------------------- carga inicial
 (async function iniciar() {
   try {
     const usuario = await exigirSesion(['ADMINISTRADOR']);
     if (!usuario) return;
+    adminId = usuario.id;
     document.getElementById('cargando').hidden = true;
     document.getElementById('contenido').hidden = false;
-    activarPestana('catalogos');
+    // Los enlaces de las notificaciones de reporte abren directamente la moderación.
+    activarPestana(['#mensajes', '#resenas'].includes(window.location.hash) ? 'moderacion' : 'catalogos');
   } catch (err) {
     document.getElementById('cargando').hidden = true;
     mostrarAviso(err.message ?? 'No se pudo cargar el panel. Inténtalo de nuevo.', 'error');

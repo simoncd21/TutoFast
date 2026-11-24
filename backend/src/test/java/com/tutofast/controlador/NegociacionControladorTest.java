@@ -75,7 +75,8 @@ class NegociacionControladorTest {
                 mock(com.tutofast.repositorio.RepositorioCalificacion.class));
 
         mvc = MockMvcBuilders.standaloneSetup(new NegociacionControlador(escenario.servicioNegociacion),
-                        new PagoControlador(escenario.servicioPagos), new PropuestaControlador(escenario.servicioPropuestas))
+                        new PagoControlador(escenario.servicioPagos, escenario.servicioNegociacion),
+                        new PropuestaControlador(escenario.servicioPropuestas))
                 .setControllerAdvice(new ManejadorGlobalExcepciones())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(mapper))
                 .setCustomArgumentResolvers(new ResolvedorUsuarioAutenticado())

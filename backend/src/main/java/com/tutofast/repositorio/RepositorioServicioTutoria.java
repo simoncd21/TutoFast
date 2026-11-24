@@ -20,4 +20,15 @@ public interface RepositorioServicioTutoria extends MongoRepository<ServicioTuto
 
     /** Para el programador de tareas: servicios en un estado cuya hora ya llegó. */
     List<ServicioTutoria> findByEstadoAndFechaHoraLessThanEqual(EstadoServicio estado, Instant limite);
+
+    /** Servicios que empiezan dentro de la ventana y aún no han recibido su recordatorio. */
+    List<ServicioTutoria> findByEstadoAndRecordatorioEnviadoFalseAndFechaHoraBetween(
+            EstadoServicio estado, Instant desde, Instant hasta);
+
+    /** Servicios finalizados en la ventana cuyo recordatorio de calificación no se ha enviado. */
+    List<ServicioTutoria> findByEstadoAndRecordatorioCalificacionEnviadoFalseAndFechaFinalizacionBetween(
+            EstadoServicio estado, Instant desde, Instant hasta);
+
+    /** Servicios finalizados de un tutor (alimenta {@code serviciosCompletados}). */
+    long countByTutorIdAndEstado(String tutorId, EstadoServicio estado);
 }

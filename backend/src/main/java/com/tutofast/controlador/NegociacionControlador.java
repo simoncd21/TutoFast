@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.tutofast.dto.ConfirmacionServicioDTO;
 import com.tutofast.dto.EnlaceServicioDTO;
+import com.tutofast.dto.LiquidacionDTO;
 import com.tutofast.dto.ServicioDTO;
 import com.tutofast.modelo.EstadoServicio;
 import com.tutofast.modelo.Rol;
@@ -62,5 +63,11 @@ public class NegociacionControlador {
     @RolesPermitidos({Rol.ESTUDIANTE, Rol.TUTOR})
     public ServicioDTO iniciar(UsuarioAutenticado usuario, @PathVariable String id) {
         return servicio.iniciarSesion(usuario.id(), id);
+    }
+
+    @PostMapping("/servicios/{id}/finalizar")
+    @RolesPermitidos(Rol.ESTUDIANTE)
+    public LiquidacionDTO finalizar(UsuarioAutenticado usuario, @PathVariable String id) {
+        return servicio.finalizarServicio(usuario.id(), id);
     }
 }

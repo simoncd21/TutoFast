@@ -32,6 +32,8 @@
           <button class="pestana" type="button" role="tab" id="pestana-comision" aria-controls="panel-comision" aria-selected="false" tabindex="-1">Comisión</button>
           <button class="pestana" type="button" role="tab" id="pestana-verificacion" aria-controls="panel-verificacion" aria-selected="false" tabindex="-1">Verificación de tutores</button>
           <button class="pestana" type="button" role="tab" id="pestana-usuarios" aria-controls="panel-usuarios" aria-selected="false" tabindex="-1">Usuarios</button>
+          <button class="pestana" type="button" role="tab" id="pestana-moderacion" aria-controls="panel-moderacion" aria-selected="false" tabindex="-1">Moderación</button>
+          <button class="pestana" type="button" role="tab" id="pestana-cierre" aria-controls="panel-cierre" aria-selected="false" tabindex="-1">Cierre automático</button>
           <button class="pestana" type="button" role="tab" id="pestana-auditoria" aria-controls="panel-auditoria" aria-selected="false" tabindex="-1">Auditoría</button>
         </div>
 
@@ -188,6 +190,40 @@
               <span id="usuarios-pagina" class="texto-suave"></span>
               <button class="btn btn--borde btn--pequeno" type="button" id="usuarios-siguiente">Siguiente</button>
             </div>
+          </div>
+        </section>
+
+        <!-- Moderación de mensajes y reseñas reportados -->
+        <section id="panel-moderacion" class="admin__panel" role="tabpanel" aria-labelledby="pestana-moderacion" hidden>
+          <div class="tarjeta">
+            <div class="barra-acciones">
+              <h2>Mensajes reportados</h2>
+              <button class="btn btn--borde btn--pequeno" type="button" id="moderacion-recargar">Actualizar</button>
+            </div>
+            <p class="texto-suave">Un mensaje reportado conserva su contenido original para el expediente. Si confirmas la infracción se retira de la vista de los participantes y puedes sancionar a quien lo escribió (advertencia, suspensión temporal o bloqueo permanente).</p>
+            <div id="mensajes-reportados" class="moderacion" aria-live="polite"></div>
+            <p id="mensajes-vacio" class="texto-suave" hidden>No hay mensajes reportados pendientes de revisión.</p>
+          </div>
+          <div class="tarjeta">
+            <h2>Reseñas reportadas</h2>
+            <p class="texto-suave">Si confirmas la infracción la reseña se oculta de forma definitiva y deja de contar en la reputación. También puedes sancionar a su autor.</p>
+            <div id="resenas-reportadas" class="moderacion" aria-live="polite"></div>
+            <p id="resenas-vacio" class="texto-suave" hidden>No hay reseñas reportadas pendientes de revisión.</p>
+          </div>
+        </section>
+
+        <!-- Cierre automático (demostración) -->
+        <section id="panel-cierre" class="admin__panel" role="tabpanel" aria-labelledby="pestana-cierre" hidden>
+          <div class="tarjeta">
+            <h2>Cierre automático de servicios</h2>
+            <p class="texto-suave">Cada 15 minutos TutoFast finaliza los servicios en desarrollo cuyo fin programado más 24 horas ya pasó y que no tienen un reporte abierto, y libera el pago al tutor. Aquí puedes ejecutarlo ahora, por ejemplo para una demostración.</p>
+            <form id="form-cierre" class="admin__formulario" novalidate>
+              <div class="campo">
+                <label><input type="checkbox" id="cierre-ignorar-plazo" name="ignorarPlazo"> Ignorar la espera de 24 horas (solo demostración)</label>
+              </div>
+              <div class="campo"><button class="btn btn--primario" type="submit" id="cierre-ejecutar">Simular cierre automático</button></div>
+            </form>
+            <div id="cierre-resultado" class="cierre-resultado" aria-live="polite" hidden></div>
           </div>
         </section>
 

@@ -167,8 +167,8 @@ El módulo se entrega en dos partes: **(A) propuestas y negociación**, hecha en
 - [x] Endpoints: `POST /api/solicitudes/{id}/confirmar`, `GET /api/servicios/mios`, `GET /api/servicios/{id}`, `PATCH /api/servicios/{id}/enlace`, `POST /api/servicios/{id}/iniciar`, `GET /api/pagos/servicio/{id}` y `GET /api/pagos/mios`.
 - [x] `ServicioDTO` ampliado (tema, participantes con nombre, resumen del pago) y `PagoResumenDTO`; el diseño de la API documenta códigos y errores.
 - [x] Frontend: `negociacion.html` + `js/paginas/negociacion.js` (lista de servicios, ficha con desglose del pago, lugar o enlace del tutor, inicio del servicio), `js/componentes/confirmacion.js` (modal «Autorizar pago simulado y confirmar», sin campos de tarjeta, con opción de simular el rechazo), botón «Autorizar pago y confirmar» en la propuesta seleccionada (`propuestas.js`), enlace «Servicios» en el encabezado de ESTUDIANTE y TUTOR y enlace de las notificaciones `SERVICIO_CONFIRMADO`.
-- [ ] `ProgramadorTareasConfig`: inicio automático CONFIRMADO → EN_DESARROLLO *(pendiente; se entrega con el cierre automático del módulo 09)*.
-- [ ] Cierre de los hilos de chat de los tutores no elegidos *(depende del módulo 08)*.
+- [x] `ProgramadorTareasConfig`: inicio automático CONFIRMADO → EN_DESARROLLO *(entregado con el módulo 09)*.
+- [x] Cierre de los hilos de chat de los tutores no elegidos *(entregado con el módulo 08)*.
 
 **Pruebas (parte B)**
 - [x] `ServicioNegociacionTest` (26 casos): confirmar congela precio y `comisionPct`, descarta las demás propuestas y notifica a ambos; 40.000/10 %, 30.000/10 % y 33.333/12,5 % (HALF_UP); un cambio posterior de comisión no altera el servicio; `tok_rechazar` y token vacío → 422 `PAGO_RECHAZADO` sin cambios de estado y con reintento posible; segunda confirmación y carrera contra el índice único → 409 sin segundo cobro; solicitud no seleccionada, sin propuesta aceptada o tutor suspendido → 409; compensación si falla el guardado; dueño, rol, cuenta y 404; enlace (inmutables → 409), inicio y consultas por participante.
@@ -181,34 +181,44 @@ El módulo se entrega en dos partes: **(A) propuestas y negociación**, hecha en
 - Un pago rechazado no deja rastro (ni siquiera auditoría), tal como describe el diseño de la API; con Atlas la transacción revertiría igualmente cualquier registro.
 - La comisión se lee de `ServicioCatalogo.consultarComision()` en el instante de confirmar y queda copiada en el servicio.
 
-## Módulo 08 · `feature/08-mensajeria-chat`
+## Módulo 08 · `feature/08-09-mensajeria-cierre-calificaciones` (entregado junto con el 09)
 **Depende de:** 07, 04
-- [ ] `servicio/ServicioMensajeria` (`enviarMensaje`, `consultarHistorial(desde)`, `listarHilos`, `reportarMensaje`, `cerrarHilos`).
-- [ ] Controlador: MensajeControlador; mensajes reportados en AdministracionControlador.
-- [ ] Endpoints: `GET/POST /api/solicitudes/{id}/mensajes`, `GET /api/solicitudes/{id}/hilos`, `POST /api/mensajes/{id}/reportar`, `GET /api/admin/mensajes-reportados`.
-- [ ] Frontend: `chat.html` (polling de 4 s con pausa por `visibilitychange` y *backoff*, adjuntos, reportar, solo lectura); pestaña "Mensajes reportados" en `admin.html`.
+- [x] `servicio/ServicioMensajeria` (`enviarMensaje`, `consultarHistorial(desde)`, `listarHilos`, `reportarMensaje`, `cerrarHilos`, `listarReportados`, `moderarMensaje`), `FiltroContactoExterno` (contactos externos y evasión de pagos), `ContextoMensajes` (acceso a adjuntos) y `AplicadorSanciones` (sanciones compartidas con la moderación de reseñas y, luego, con el módulo 10).
+- [x] Hilo por `(solicitudId, tutorId)`; solo lectura si la solicitud se cancela, la propuesta del tutor se descarta o retira, o el servicio concluye. `ServicioNegociacion.confirmarServicio` cierra los hilos de los tutores no elegidos (aviso del sistema + auditoría `HILO_CERRADO`; un fallo no revierte la confirmación).
+- [x] Controlador: `MensajeControlador`; moderación en `AdministracionControlador`.
+- [x] Endpoints: `GET/POST /api/solicitudes/{id}/mensajes`, `GET /api/solicitudes/{id}/hilos`, `POST /api/mensajes/{id}/reportar`, `GET /api/admin/mensajes-reportados`, `POST /api/admin/mensajes-reportados/{id}/moderar`.
+- [x] Moderación: desestimar o confirmar la infracción (el mensaje se retira de la vista de los participantes y se conserva el original) con sanción opcional (advertencia, suspensión temporal, bloqueo permanente); la sanción cuelga de un reporte resuelto que permitirá apelarla en el módulo 10.
+- [x] Frontend: componente compartido `js/componentes/chat.js` (polling de 4 s con pausa por `visibilitychange` y *backoff*, adjuntos, reportar, solo lectura) montado en el detalle de `solicitudes.html` (un hilo por tutor) y en `negociacion.html`; pestaña «Moderación» en `admin.html` (la plan original preveía `chat.html`: se usó un componente para no duplicar pantallas). Corrige además el filtro de enlaces de la campana, que rechazaba `pagina.html?id=…`.
 
 **Pruebas**
-- [ ] `ServicioMensajeriaTest`: un tercero no puede leer ni escribir (403); hilo cerrado → 403; `.bat` → 415; `desde` devuelve solo los mensajes nuevos.
-- [ ] Manual: dos navegadores ven los mensajes del otro en unos 4 s.
+- [x] `FiltroContactoExternoTest` (46 casos), `ServicioMensajeriaTest` (49): tercero y administrador no escriben (403), hilo cerrado → 403, `.bat` → 415, `desde` solo trae lo nuevo, límite de 100, no leídos, avisos, reportes, moderación con sanción, compensaciones; `ModeracionModeloTest`, `AplicadorSancionesTest`.
+- [x] `MensajeriaYCierreControladorTest`: flujo HTTP con filtro JWT y roles (multipart, 422, 403, 409, cola de moderación).
+- [x] Interfaz verificada en Edge headless contra una API simulada (chat, envío, bloqueo, polling, reporte, moderación) en tema claro, oscuro y móvil.
+- [ ] Manual contra Atlas: dos navegadores ven los mensajes del otro en unos 4 s.
 
-## Módulo 09 · `feature/09-finalizacion-pagos-reputacion`
+## Módulo 09 · `feature/08-09-mensajeria-cierre-calificaciones` (entregado junto con el 08)
 **Depende de:** 07
-- [ ] `ServicioNegociacion.finalizarServicio` y `cerrarAutomaticamente` (una transacción por servicio).
-- [ ] `ServicioPagos` (`liberarPago`, `reembolsar`, `congelar`).
-- [ ] `servicio/ServicioReputacion` (`calificar`, `cerrarResenas`, `recalcularPromedio`).
-- [ ] `ServicioNotificaciones.recordar`.
-- [ ] `ProgramadorTareasConfig`: cierre cada 15 min; recordatorios y reseñas cada hora.
-- [ ] Controladores: PagoControlador, CalificacionControlador.
-- [ ] Endpoints: `POST /api/servicios/{id}/finalizar`, `GET /api/pagos/servicio/{id}`, `GET /api/pagos/mios`, **`POST /api/pagos/simular-cierre-automatico` (solo ADMINISTRADOR)**, `POST/GET /api/servicios/{id}/calificaciones`.
-- [ ] Frontend: desglose de liquidación en `negociacion.html`; `calificaciones.html`; reseñas en `perfil.html`; botón "Simular cierre automático" en `admin.html`.
+- [x] `ServicioNegociacion.finalizarServicio` (estudiante del servicio; libera el pago, recalcula `serviciosCompletados`), `cerrarAutomaticamente` (una transacción por servicio con `TransactionTemplate`), `simularCierreAutomatico`, `iniciarAutomaticamente` y `recordarSesiones`.
+- [x] `ServicioPagos.liberarPago`, `congelarPago`, `reembolsarPago`.
+- [x] `servicio/ServicioReputacion` (`calificar`, `consultar`, `cerrarResenas`, `recordarCalificaciones`, `recalcularTutor`, `recalcularEstudiante`, `reportarResena`, `moderarResena`). *(Es el nombre del plan; calificaciones con criterios 1–5 según el diagrama de clases.)*
+- [x] `ServicioNotificaciones.recordar`; tipo nuevo `RESENA_DISPONIBLE`.
+- [x] `config/ProgramadorTareasConfig` (`@EnableScheduling` ya activo): inicio automático cada minuto, cierre cada 15 min, y cada hora recordatorios de sesión, publicación de reseñas vencidas, recordatorios de calificación y fin de suspensiones vencidas. Cada tarea captura sus errores; se apaga con `tutofast.tareas.habilitadas=false`.
+- [x] Controladores: `CalificacionControlador`; `NegociacionControlador` (finalizar) y `PagoControlador` (simulación).
+- [x] Endpoints: `POST /api/servicios/{id}/finalizar`, `POST /api/pagos/simular-cierre-automatico` (solo ADMINISTRADOR), `POST/GET /api/servicios/{id}/calificaciones`, `POST /api/calificaciones/{id}/reportar`, `GET /api/admin/resenas-reportadas`, `POST /api/admin/resenas-reportadas/{id}/moderar`.
+- [x] Frontend: en `negociacion.html` finalizar con confirmación, desglose de liquidación, calificación con estrellas (6 criterios el estudiante, 3 el tutor), reseña de la contraparte con opción de reportarla; en `admin.html` pestañas «Moderación» (mensajes y reseñas) y «Cierre automático» (botón «Simular cierre automático»). Las reseñas públicas siguen en `tutores.html`.
 
 **Pruebas**
-- [ ] `ServicioPagosTest`: 40.000 / 10 % → 4.000 / 36.000, estado LIBERADO.
-- [ ] Doble finalización → 409.
-- [ ] `cerrarAutomaticamente` omite servicios con reporte abierto y los que aún no cumplen +24 h (salvo `ignorarPlazo`).
-- [ ] `simular-cierre-automatico` con rol TUTOR → 403.
-- [ ] `ServicioReputacionTest`: calificar un servicio no finalizado → 422; duplicado → 409; día 15 → 422; el promedio se recalcula.
+- [x] `ServicioPagosLiquidacionTest`: 40.000 / 10 % → 4.000 / 36.000 LIBERADO; 33.333 / 12,5 % HALF_UP; congelar y reembolsar.
+- [x] `ServicioNegociacionCierreTest` (26): doble finalización → 409; `cerrarAutomaticamente` omite servicios con reporte abierto y los que no cumplen +24 h (salvo `ignorarPlazo`); un fallo no detiene a los demás; una transacción por servicio; inicio automático y recordatorios.
+- [x] `ServicioReputacionTest` (35): servicio no finalizado → 422; duplicado → 409; día 15 → 422; el promedio se recalcula (HALF_UP); publicación por plazo; moderación de reseñas.
+- [x] `ProgramadorTareasConfigTest`, y en `MensajeriaYCierreControladorTest`: `simular-cierre-automatico` con rol TUTOR → 403.
+- [x] Interfaz verificada en Edge headless (finalizar, calificar, reseñas, moderación, cierre) en tema claro, oscuro y móvil.
+- [ ] Manual contra Atlas con `MONGO_TRANSACCIONES=true`: finalizar, cierre automático y simulación.
+
+**Notas de diseño**
+- Los contadores de reputación se recalculan desde los datos (no se incrementan): idempotente y autocorregible.
+- Orden de la finalización: validar → servicio FINALIZADO → pago LIBERADO (si falla, se restaura el servicio) → recálculo → auditoría → avisos.
+- Las sanciones temporales se levantan con la tarea horaria (`AplicadorSanciones.levantarVencidas`); una suspensión en apelación no se levanta sola.
 
 ## Módulo 10 · `feature/10-reportes-sanciones-despliegue`
 **Depende de:** 08, 09

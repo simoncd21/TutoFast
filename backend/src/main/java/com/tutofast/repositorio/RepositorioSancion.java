@@ -16,4 +16,7 @@ public interface RepositorioSancion extends MongoRepository<Sancion, String> {
     List<Sancion> findByUsuarioIdAndEstadoIn(String usuarioId, Collection<EstadoSancion> estados);
 
     List<Sancion> findByReporteId(String reporteId);
+
+    /** Sanciones en esos estados cuya vigencia ya terminó (las temporales que deben levantarse). */
+    List<Sancion> findByEstadoInAndVigenciaFinLessThanEqual(Collection<EstadoSancion> estados, java.time.Instant ahora);
 }

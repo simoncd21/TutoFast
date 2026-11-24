@@ -1,7 +1,8 @@
-// Servicios confirmados: lista, ficha del servicio, desglose del pago retenido, enlace del tutor e inicio.
-// Todo el contenido dinámico se construye con textContent (nunca innerHTML).
+// Servicios confirmados: lista, ficha del servicio, desglose del pago, enlace del tutor, inicio, finalización,
+// calificación bilateral y conversación. Todo el contenido dinámico se construye con textContent (nunca innerHTML).
 import { iniciarEncabezado } from '../componentes/encabezado.js';
 import { exito, error as toastError } from '../componentes/alertas.js';
+import { montarChat } from '../componentes/chat.js';
 import { pesos } from '../componentes/confirmacion.js';
 import { api, ErrorApi } from '../servicios/api.js';
 import { exigirSesion, rolActivo } from '../sesion.js';
@@ -129,6 +130,26 @@ function pintarFicha(s, papel) {
   }
 }
 
+function textoEstadoPago(s, papel) {
+  const tutor = papel === 'TUTOR';
+  switch (s.pago.estado) {
+    case 'RETENIDO':
+      return tutor
+        ? 'Los fondos están retenidos y se liberarán cuando finalice el servicio.'
+        : `Pagaste ${pesos(s.pago.montoRetenidoCOP)}; se liberan al tutor cuando finalice el servicio.`;
+    case 'LIBERADO':
+      return tutor
+        ? `Pago liberado: recibiste ${pesos(s.pago.montoNetoCOP)} netos tras la comisión de TutoFast.`
+        : `Pago liberado al tutor: ${pesos(s.pago.montoNetoCOP)} netos y ${pesos(s.pago.comisionCOP)} de comisión de TutoFast.`;
+    case 'CONGELADO':
+      return 'El pago está congelado mientras un administrador revisa un reporte sobre este servicio.';
+    case 'REEMBOLSADO':
+      return tutor ? 'El pago fue reembolsado al estudiante.' : `Se reembolsó el monto completo (${pesos(s.pago.montoRetenidoCOP)}), sin comisión.`;
+    default:
+      return 'Estado del pago actualizado según el ciclo del servicio.';
+  }
+}
+
 function pintarPago(s, papel) {
   const seccion = document.getElementById('pago');
   const titulo = el('div', 'oferta');
@@ -147,11 +168,7 @@ function pintarPago(s, papel) {
   fila('Precio acordado', pesos(s.precioFinalCOP));
   fila(`Comisión TutoFast (${Number(s.comisionPct).toLocaleString('es-CO')} %)`, `− ${pesos(s.pago.comisionCOP)}`);
   fila(papel === 'TUTOR' ? 'Recibirás (neto)' : 'Neto para el tutor', pesos(s.pago.montoNetoCOP), 'liquidacion__total');
-  const notas = [el('p', 'texto-suave', s.pago.estado === 'RETENIDO'
-    ? (papel === 'TUTOR'
-      ? 'Los fondos están retenidos y se liberarán cuando finalice el servicio.'
-      : `Pagaste ${pesos(s.pago.montoRetenidoCOP)}; se liberan al tutor cuando finalice el servicio.`)
-    : 'Estado del pago actualizado según el ciclo del servicio.')];
+  const notas = [el('p', 'texto-suave', textoEstadoPago(s, papel))];
   if (s.pago.referencia) notas.push(el('p', 'texto-suave', `Referencia de la pasarela simulada: ${s.pago.referencia}`));
   seccion.replaceChildren(titulo, lista, ...notas);
 }
@@ -174,10 +191,237 @@ function pintarAcciones(s, papel, recargar) {
         iniciar.disabled = false;
       }
     });
-    nodos.push(el('p', 'texto-suave', 'Inicia el servicio cuando comience la sesión; cualquiera de los dos participantes puede hacerlo.'), iniciar);
+    nodos.push(el('p', 'texto-suave', 'Inicia el servicio cuando comience la sesión; también arranca solo a la hora programada.'), iniciar);
+  }
+  if (papel === 'ESTUDIANTE' && s.estado === 'EN_DESARROLLO') nodos.push(...bloqueFinalizar(s, recargar));
+  if (papel === 'TUTOR' && s.estado === 'EN_DESARROLLO') {
+    nodos.push(el('p', 'texto-suave', 'El servicio está en desarrollo. El estudiante lo finaliza al terminar la sesión; si no lo hace, '
+      + 'se cierra automáticamente 24 horas después de la hora de fin programada y se libera tu pago.'));
+  }
+  if (papel && s.estado === 'EN_REVISION') {
+    nodos.push(el('p', 'texto-suave', 'El servicio está en revisión por un reporte: el pago permanece congelado hasta que un administrador lo resuelva.'));
   }
   seccion.hidden = nodos.length === 0;
   seccion.replaceChildren(...nodos);
+}
+
+/** Finalizar con una confirmación explícita: libera el pago al tutor y no se puede deshacer. */
+function bloqueFinalizar(s, recargar) {
+  const neto = s.pago ? pesos(s.pago.montoNetoCOP) : 'el pago';
+  const aviso = el('p', 'texto-suave', `Cuando termine la sesión, finaliza el servicio: se liberarán ${neto} al tutor (neto tras la comisión de TutoFast). `
+    + 'Si no lo haces, se cerrará automáticamente 24 horas después de la hora de fin programada.');
+  const finalizar = el('button', 'btn btn--primario', 'Finalizar servicio y liberar el pago');
+  finalizar.type = 'button';
+  const confirmacion = el('div', 'moderacion__form');
+  confirmacion.hidden = true;
+  const aceptar = el('button', 'btn btn--primario', 'Sí, finalizar');
+  aceptar.type = 'button';
+  const no = el('button', 'btn btn--borde', 'Todavía no');
+  no.type = 'button';
+  const fila = el('div', 'moderacion__acciones');
+  fila.append(aceptar, no);
+  confirmacion.append(el('p', '', 'Esta acción libera el pago al tutor y no se puede deshacer. ¿Confirmas que la tutoría se realizó?'), fila);
+  finalizar.addEventListener('click', () => { confirmacion.hidden = false; finalizar.hidden = true; aceptar.focus(); });
+  no.addEventListener('click', () => { confirmacion.hidden = true; finalizar.hidden = false; });
+  aceptar.addEventListener('click', async () => {
+    aceptar.disabled = true;
+    try {
+      await api.post(`/api/servicios/${encodeURIComponent(s.id)}/finalizar`);
+      exito('Servicio finalizado: el pago fue liberado y ya puedes calificar');
+      await recargar();
+    } catch (e) {
+      toastError(mensajeDe(e));
+      aceptar.disabled = false;
+      if (e instanceof ErrorApi && e.estado === 409) await recargar().catch(() => {});
+    }
+  });
+  return [aviso, finalizar, confirmacion];
+}
+
+// ---------------------------------------------------------------- calificaciones
+const CRITERIOS_AL_TUTOR = [
+  ['claridadPedagogica', 'Claridad pedagógica'], ['dominioTematico', 'Dominio temático'], ['puntualidad', 'Puntualidad'],
+  ['cumplimiento', 'Cumplimiento'], ['trato', 'Trato'], ['relacionCalidadPrecio', 'Relación calidad-precio'],
+];
+const CRITERIOS_AL_ESTUDIANTE = [
+  ['puntualidad', 'Puntualidad'], ['comunicacion', 'Comunicación'], ['cumplimiento', 'Cumplimiento'],
+];
+const ETIQUETA_CRITERIO = Object.fromEntries([...CRITERIOS_AL_TUTOR, ...CRITERIOS_AL_ESTUDIANTE]);
+
+function estrellasFijas(valor) {
+  const llenas = Math.round(Number(valor));
+  const nodo = el('span', 'estrellas-fijas');
+  nodo.setAttribute('role', 'img');
+  nodo.setAttribute('aria-label', `${Number(valor).toLocaleString('es-CO', { minimumFractionDigits: 2 })} de 5`);
+  nodo.append(document.createTextNode('★'.repeat(llenas)), el('span', 'apagada', '★'.repeat(Math.max(0, 5 - llenas))));
+  return nodo;
+}
+
+function bloqueResena(titulo, c) {
+  const caja = el('div', 'resena-propia');
+  const cab = el('div', 'oferta');
+  cab.append(el('strong', '', titulo), estrellasFijas(c.promedio), el('strong', '', Number(c.promedio).toLocaleString('es-CO', { minimumFractionDigits: 2 })));
+  const criterios = el('ul');
+  Object.entries(c.criterios ?? {}).forEach(([clave, valor]) => criterios.appendChild(el('li', '', `${ETIQUETA_CRITERIO[clave] ?? clave}: ${valor}/5`)));
+  caja.append(cab, criterios);
+  if (c.comentario) caja.appendChild(el('p', 'resena__comentario', `«${c.comentario}»`));
+  return caja;
+}
+
+function formularioCalificacion(s, papel, recargar) {
+  const criterios = papel === 'ESTUDIANTE' ? CRITERIOS_AL_TUTOR : CRITERIOS_AL_ESTUDIANTE;
+  const form = el('form', 'calificacion-form');
+  form.noValidate = true;
+  criterios.forEach(([clave, etiqueta]) => {
+    const grupo = el('fieldset', 'criterio');
+    grupo.appendChild(el('legend', '', etiqueta));
+    const estrellas = el('div', 'estrellas');
+    [5, 4, 3, 2, 1].forEach((v) => {
+      const radio = el('input');
+      radio.type = 'radio';
+      radio.name = clave;
+      radio.value = String(v);
+      radio.id = `c-${clave}-${v}`;
+      const label = el('label', '', '★');
+      label.htmlFor = radio.id;
+      label.title = `${v} de 5`;
+      const lector = el('span', 'sr-only', `${v} de 5`);
+      label.appendChild(lector);
+      estrellas.append(radio, label);
+    });
+    grupo.appendChild(estrellas);
+    form.appendChild(grupo);
+  });
+  const campo = el('div', 'campo');
+  const etiqueta = el('label', '', 'Comentario (opcional)');
+  etiqueta.htmlFor = 'comentario-calificacion';
+  const comentario = el('textarea');
+  comentario.id = 'comentario-calificacion';
+  comentario.rows = 3;
+  comentario.maxLength = 500;
+  comentario.placeholder = 'La reseña será pública cuando ambas partes califiquen o venza el plazo. No incluyas datos de contacto.';
+  const error = el('div', 'campo__error');
+  error.setAttribute('role', 'alert');
+  error.hidden = true;
+  campo.append(etiqueta, comentario, error);
+  const enviar = el('button', 'btn btn--primario', papel === 'ESTUDIANTE' ? 'Calificar al tutor' : 'Calificar al estudiante');
+  enviar.type = 'submit';
+  form.append(campo, enviar);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    error.hidden = true;
+    const cuerpo = { comentario: comentario.value.trim() || undefined };
+    const faltan = [];
+    criterios.forEach(([clave, nombre]) => {
+      const marcado = form.querySelector(`input[name="${clave}"]:checked`);
+      if (marcado) cuerpo[clave] = Number(marcado.value); else faltan.push(nombre);
+    });
+    if (faltan.length) {
+      error.textContent = `Falta calificar: ${faltan.join(', ')}`;
+      error.hidden = false;
+      return;
+    }
+    enviar.disabled = true;
+    try {
+      const creada = await api.post(`/api/servicios/${encodeURIComponent(s.id)}/calificaciones`, cuerpo);
+      exito(creada.visible ? 'Calificación enviada: ambas reseñas ya son visibles' : 'Calificación enviada; se publicará cuando la otra parte califique o venza el plazo');
+      await recargar();
+    } catch (err) {
+      error.textContent = mensajeDe(err);
+      error.hidden = false;
+      enviar.disabled = false;
+    }
+  });
+  return form;
+}
+
+function botonReportarResena(c, recargar) {
+  const abrir = el('button', 'btn btn--borde btn--pequeno', 'Reportar esta reseña');
+  abrir.type = 'button';
+  const form = el('form', 'moderacion__form');
+  form.hidden = true;
+  form.noValidate = true;
+  const motivo = el('textarea');
+  motivo.rows = 2;
+  motivo.maxLength = 500;
+  motivo.placeholder = '¿Por qué la reseña incumple las normas? (obligatorio)';
+  motivo.setAttribute('aria-label', 'Motivo del reporte de la reseña');
+  const enviar = el('button', 'btn btn--peligro btn--pequeno', 'Enviar reporte');
+  enviar.type = 'submit';
+  form.append(motivo, enviar);
+  abrir.addEventListener('click', () => { form.hidden = !form.hidden; if (!form.hidden) motivo.focus(); });
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!motivo.value.trim()) { toastError('Indica el motivo del reporte'); return; }
+    enviar.disabled = true;
+    try {
+      await api.post(`/api/calificaciones/${encodeURIComponent(c.id)}/reportar`, { motivo: motivo.value.trim() });
+      exito('Reporte enviado; un administrador lo revisará');
+      await recargar();
+    } catch (err) {
+      toastError(mensajeDe(err));
+      enviar.disabled = false;
+    }
+  });
+  const contenedor = el('div');
+  contenedor.append(abrir, form);
+  return contenedor;
+}
+
+async function pintarCalificaciones(s, papel, recargar) {
+  const seccion = document.getElementById('calificaciones');
+  if (!papel || s.estado !== 'FINALIZADO') {
+    seccion.hidden = true;
+    seccion.replaceChildren();
+    return;
+  }
+  seccion.hidden = false;
+  const titulo = el('h2', '', 'Calificaciones');
+  let datos;
+  try {
+    datos = await api.get(`/api/servicios/${encodeURIComponent(s.id)}/calificaciones`);
+  } catch (e) {
+    seccion.replaceChildren(titulo, el('p', 'texto-suave', mensajeDe(e)));
+    return;
+  }
+  const nodos = [titulo];
+  const contraparteNombre = papel === 'ESTUDIANTE' ? s.tutor.nombre : s.estudiante.nombre;
+  if (datos.fechaLimite) {
+    nodos.push(el('p', 'texto-suave', datos.puedeCalificar
+      ? `Puedes calificar hasta el ${fecha(datos.fechaLimite)}. Las reseñas se publican cuando ambas partes califican o al vencer el plazo.`
+      : `El plazo para calificar ${new Date(datos.fechaLimite) < new Date() ? 'venció' : 'vence'} el ${fecha(datos.fechaLimite)}`));
+  }
+  if (datos.mia) {
+    nodos.push(bloqueResena('Tu calificación', datos.mia));
+    if (!datos.mia.visible) nodos.push(el('p', 'texto-suave', 'Tu reseña aún no es pública: se publicará cuando la otra parte califique o venza el plazo.'));
+  } else if (datos.puedeCalificar) {
+    nodos.push(el('h3', '', `Califica a ${contraparteNombre}`),
+      formularioCalificacion(s, papel, recargar));
+  } else {
+    nodos.push(el('p', 'texto-suave', 'No calificaste este servicio y el plazo ya venció.'));
+  }
+  if (datos.contraparte) {
+    nodos.push(bloqueResena(`Reseña de ${contraparteNombre}`, datos.contraparte));
+    nodos.push(botonReportarResena(datos.contraparte, recargar));
+  } else {
+    nodos.push(el('p', 'texto-suave', `La reseña de ${contraparteNombre} se mostrará cuando ambos califiquen o venza el plazo.`));
+  }
+  seccion.replaceChildren(...nodos);
+}
+
+// ---------------------------------------------------------------- conversación
+let chatActual = null;
+
+function pintarConversacion(s, papel) {
+  const tarjeta = document.getElementById('conversacion');
+  chatActual?.destruir();
+  chatActual = null;
+  const rol = papel ?? (rolActivo() === 'ADMINISTRADOR' ? 'ADMINISTRADOR' : null);
+  if (!rol) { tarjeta.hidden = true; return; }
+  tarjeta.hidden = false;
+  chatActual = montarChat(document.getElementById('conversacion-zona'), {
+    solicitudId: s.solicitudId, tutorId: s.tutor.id, usuarioId: sesion.id, rol,
+  });
 }
 
 function formularioEnlace(s, recargar) {
@@ -227,6 +471,8 @@ async function mostrarDetalle(id) {
     pintarFicha(s, papel);
     pintarPago(s, papel);
     pintarAcciones(s, papel, cargar);
+    pintarConversacion(s, papel);
+    await pintarCalificaciones(s, papel, cargar);
   };
   try {
     await cargar();

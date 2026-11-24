@@ -36,6 +36,19 @@ public class ServicioNotificaciones {
         notificador.notificar(usuarioId, tipo, titulo, mensaje, enlace);
     }
 
+    /**
+     * Notificación de recordatorio emitida por las tareas programadas: nunca lanza. Devuelve {@code false} si no pudo
+     * entregarla, para que la tarea no marque el recordatorio como enviado y lo reintente en la siguiente pasada.
+     */
+    public boolean recordar(String usuarioId, TipoNotificacion tipo, String titulo, String mensaje, String enlace) {
+        try {
+            notificar(usuarioId, tipo, titulo, mensaje, enlace);
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     public Pagina<NotificacionDTO> consultar(String usuarioId, boolean soloNoLeidas, int pagina, int tamano) {
         PageRequest paginacion = PageRequest.of(Math.max(pagina, 0), Math.min(Math.max(tamano, 1), TAMANO_MAXIMO_PAGINA));
         Page<DocumentoNotificacion> resultado = soloNoLeidas

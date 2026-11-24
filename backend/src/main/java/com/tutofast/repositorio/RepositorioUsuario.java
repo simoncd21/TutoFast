@@ -19,6 +19,9 @@ public interface RepositorioUsuario extends MongoRepository<Usuario, String>, Re
 
     boolean existsByRolesContaining(Rol rol);
 
+    /** Usuarios con ese rol (por ejemplo, los administradores a quienes se avisa de un reporte). */
+    List<Usuario> findByRolesContaining(Rol rol);
+
     /** Usuario cuyo perfil de tutor referencia ese archivo de GridFS como soporte de verificación. */
     Optional<Usuario> findByPerfilTutorSoportesRutaArchivo(String archivoId);
 
