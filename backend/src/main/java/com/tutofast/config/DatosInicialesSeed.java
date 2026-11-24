@@ -18,11 +18,13 @@ import com.tutofast.integracion.adaptadores.DocumentoNotificacion;
 import com.tutofast.modelo.Mensaje;
 import com.tutofast.modelo.ParametroComision;
 import com.tutofast.modelo.Propuesta;
+import com.tutofast.servicio.ServicioCatalogo;
 import com.tutofast.servicio.ServicioIdentidad;
 
 /**
- * Datos iniciales al arrancar: índices que no se pueden declarar con anotaciones (parciales y TTL) y administrador
- * inicial si se definen ADMIN_CORREO y ADMIN_CLAVE y aún no hay ninguno.
+ * Datos iniciales al arrancar: índices que no se pueden declarar con anotaciones (parciales y TTL), administrador
+ * inicial si se definen ADMIN_CORREO y ADMIN_CLAVE y aún no hay ninguno, y catálogo de demostración con la
+ * comisión inicial del 10 % (idempotente).
  */
 @Component
 public class DatosInicialesSeed implements ApplicationRunner {
@@ -33,15 +35,18 @@ public class DatosInicialesSeed implements ApplicationRunner {
     static final Duration RETENCION_NOTIFICACIONES = Duration.ofDays(180);
 
     private final ServicioIdentidad servicioIdentidad;
+    private final ServicioCatalogo servicioCatalogo;
     private final MongoTemplate mongoTemplate;
     private final String adminCorreo;
     private final String adminClave;
 
     public DatosInicialesSeed(ServicioIdentidad servicioIdentidad,
+                              ServicioCatalogo servicioCatalogo,
                               MongoTemplate mongoTemplate,
                               @Value("${tutofast.admin.correo:}") String adminCorreo,
                               @Value("${tutofast.admin.clave:}") String adminClave) {
         this.servicioIdentidad = servicioIdentidad;
+        this.servicioCatalogo = servicioCatalogo;
         this.mongoTemplate = mongoTemplate;
         this.adminCorreo = adminCorreo;
         this.adminClave = adminClave;
@@ -50,12 +55,26 @@ public class DatosInicialesSeed implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         crearIndicesEspeciales(mongoTemplate);
+        sembrarAdministrador();
+        sembrarCatalogo();
+    }
+
+    private void sembrarAdministrador() {
         if (adminCorreo.isBlank() || adminClave.isBlank()) {
             log.info("Seed de administrador omitido: ADMIN_CORREO/ADMIN_CLAVE no definidos");
             return;
         }
         if (servicioIdentidad.crearAdministradorSiNoExiste(adminCorreo, adminClave)) {
             log.info("Administrador inicial creado: {}", adminCorreo);
+        }
+    }
+
+    /** Un fallo aquí se registra pero no impide arrancar la aplicación. */
+    private void sembrarCatalogo() {
+        try {
+            servicioCatalogo.sembrarDatosIniciales();
+        } catch (RuntimeException e) {
+            log.error("No se pudo sembrar el catálogo inicial: {}", e.getMessage());
         }
     }
 

@@ -29,7 +29,7 @@ import com.tutofast.repositorio.RepositorioRegistroAuditoria;
 class ServicioAuditoriaTest {
 
     private final List<RegistroAuditoria> bitacora = new ArrayList<>();
-    private final ServicioAuditoria servicio = new ServicioAuditoria(RepositorioAuditoriaEnMemoria.crear(bitacora));
+    private final ServicioAuditoria servicio = com.tutofast.RepositorioAuditoriaEnMemoria.servicio(bitacora);
 
     @Test
     void registraLaAccionConFechaYDetalle() {
@@ -81,7 +81,7 @@ class ServicioAuditoriaTest {
         Page<RegistroAuditoria> esperado = new PageImpl<>(List.of(new RegistroAuditoria()));
         when(repo.buscar("u1", "Usuario", desde, hasta, pagina)).thenReturn(esperado);
 
-        Page<RegistroAuditoria> resultado = new ServicioAuditoria(repo)
+        Page<RegistroAuditoria> resultado = new ServicioAuditoria(repo, mock(com.tutofast.repositorio.RepositorioUsuario.class))
                 .consultar("u1", "Usuario", desde, hasta, pagina);
 
         assertSame(esperado, resultado);

@@ -2,6 +2,7 @@
 import { iniciarEncabezado } from '../componentes/encabezado.js';
 import { exito, error as toastError } from '../componentes/alertas.js';
 import { api, ErrorApi } from '../servicios/api.js';
+import { enlazarSelectsAcademicos } from '../servicios/catalogo.js';
 import { estaAutenticado, guardarSesion, destinoSeguro } from '../sesion.js';
 
 const parametros = new URLSearchParams(window.location.search);
@@ -129,10 +130,20 @@ formularioIngreso.addEventListener('submit', async (e) => {
 // ---- Registro ----
 const formularioRegistro = pestanas.registro.panel;
 const campoSemestre = document.getElementById('campo-semestre');
+const camposAcademicos = document.getElementById('campos-academicos');
+
+// Selects encadenados universidad → facultad → programa (solo para estudiantes).
+const selectsAcademicos = enlazarSelectsAcademicos({
+  universidad: document.getElementById('registro-universidad'),
+  facultad: document.getElementById('registro-facultad'),
+  programa: document.getElementById('registro-programa'),
+});
+selectsAcademicos.iniciar();
 
 function actualizarCamposPorRol() {
   const esEstudiante = formularioRegistro.elements.rol.value === 'ESTUDIANTE';
   campoSemestre.hidden = !esEstudiante;
+  camposAcademicos.hidden = !esEstudiante;
 }
 formularioRegistro.querySelectorAll('input[name="rol"]').forEach((r) => r.addEventListener('change', actualizarCamposPorRol));
 actualizarCamposPorRol();
@@ -182,6 +193,7 @@ formularioRegistro.addEventListener('submit', async (e) => {
     aceptaTratamientoDatos: v.acepta,
   };
   if (v.rol === 'ESTUDIANTE' && v.semestre) cuerpo.semestre = Number(v.semestre);
+  if (v.rol === 'ESTUDIANTE' && selectsAcademicos.programaId()) cuerpo.programaId = selectsAcademicos.programaId();
 
   ocupado(formularioRegistro, true, 'Creando cuenta…');
   try {
@@ -189,6 +201,7 @@ formularioRegistro.addEventListener('submit', async (e) => {
     const mensaje = respuesta?.mensaje ?? 'Registro exitoso en TutoFast';
     exito(mensaje);
     formularioRegistro.reset();
+    selectsAcademicos.iniciar();
     actualizarCamposPorRol();
     formularioIngreso.elements.correo.value = v.correo;
     activarPestana('ingreso');

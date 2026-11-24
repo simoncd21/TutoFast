@@ -1,12 +1,14 @@
 package com.tutofast.servicio;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,8 +22,14 @@ import com.tutofast.dto.RegistroDTO;
 import com.tutofast.dto.RegistroRespuestaDTO;
 import com.tutofast.dto.SesionDTO;
 import com.tutofast.dto.ArchivoDTO;
+import com.tutofast.dto.Pagina;
+import com.tutofast.dto.SoporteColaDTO;
 import com.tutofast.dto.SoporteDTO;
+import com.tutofast.dto.UsuarioAdminDTO;
 import com.tutofast.dto.UsuarioDTO;
+import com.tutofast.integracion.puertos.TipoNotificacion;
+import com.tutofast.modelo.EstadoSoporte;
+import com.tutofast.modelo.PrioridadVerificacion;
 import com.tutofast.excepcion.ExcepcionAutorizacion;
 import com.tutofast.excepcion.ExcepcionNegocio;
 import com.tutofast.excepcion.ExcepcionNoAutenticado;
@@ -48,6 +56,8 @@ public class ServicioIdentidad {
             "Debe aceptar la política de tratamiento de datos conforme a la Ley 1581 de 2012 para continuar";
     /** Tope de soportes pendientes de revisión por tutor (evita inundar la cola del administrador). */
     public static final int MAX_SOPORTES_EN_REVISION = 5;
+    /** Los correos que terminan así tienen prioridad en la cola de verificación. */
+    public static final String SUFIJO_CORREO_INSTITUCIONAL = ".edu.co";
     static final String ENTIDAD_USUARIO = "Usuario";
     static final String MENSAJE_CREDENCIALES = "Correo o contraseña incorrectos";
 
@@ -56,16 +66,19 @@ public class ServicioIdentidad {
     private final JwtUtil jwtUtil;
     private final ServicioAuditoria auditoria;
     private final ServicioArchivos archivos;
+    private final ServicioNotificaciones notificaciones;
     /** Hash descartable para que un correo inexistente tarde lo mismo que uno con clave errónea. */
     private final String hashFalso;
 
     public ServicioIdentidad(RepositorioUsuario repositorio, PasswordEncoder codificador, JwtUtil jwtUtil,
-                             ServicioAuditoria auditoria, ServicioArchivos archivos) {
+                             ServicioAuditoria auditoria, ServicioArchivos archivos,
+                             ServicioNotificaciones notificaciones) {
         this.repositorio = repositorio;
         this.codificador = codificador;
         this.jwtUtil = jwtUtil;
         this.auditoria = auditoria;
         this.archivos = archivos;
+        this.notificaciones = notificaciones;
         this.hashFalso = codificador.encode("clave-inexistente-tutofast");
     }
 
@@ -210,6 +223,112 @@ public class ServicioIdentidad {
         }
         return usuario.getPerfilTutor().getSoportes().stream()
                 .map(UsuarioMapper::aSoporteDTO).toList();
+    }
+
+    // ------------------------------------------------------------ administración
+
+    /**
+     * Cola de verificación: un elemento por soporte en el estado indicado. Primero los tutores con correo
+     * institucional {@code .edu.co} (prioridad ALTA) y, dentro de cada grupo, los más antiguos.
+     */
+    public List<SoporteColaDTO> consultarColaVerificacion(EstadoSoporte estado) {
+        Comparator<SoporteColaDTO> orden = Comparator
+                .comparing((SoporteColaDTO e) -> e.prioridad() == PrioridadVerificacion.ALTA ? 0 : 1)
+                .thenComparing(e -> e.soporte().fechaEnvio(), Comparator.nullsLast(Comparator.naturalOrder()));
+        return repositorio.findByPerfilTutorSoportesEstado(estado).stream()
+                .filter(u -> u.getPerfilTutor() != null)
+                .flatMap(u -> u.getPerfilTutor().getSoportes().stream()
+                        .filter(s -> s.getEstado() == estado)
+                        .map(s -> aElementoCola(u, s)))
+                .sorted(orden)
+                .toList();
+    }
+
+    /** Aprueba o rechaza un soporte de verificación y recalcula el nivel del tutor. */
+    public SoporteDTO verificarTutor(String administradorId, String usuarioId, String soporteId,
+                                     boolean aprobar, String observacion) {
+        String texto = observacion == null || observacion.isBlank() ? null : observacion.trim();
+        if (!aprobar && texto == null) {
+            throw new ExcepcionNegocio("La observación es obligatoria al rechazar un soporte");
+        }
+        Usuario tutor = buscar(usuarioId);
+        PerfilTutor perfil = tutor.getPerfilTutor();
+        if (!tutor.tieneRol(Rol.TUTOR) || perfil == null) {
+            throw new ExcepcionNoEncontrado("El usuario no es un tutor");
+        }
+        SoporteVerificacion soporte = perfil.getSoportes().stream()
+                .filter(s -> s.getId().equals(soporteId)).findFirst()
+                .orElseThrow(() -> new ExcepcionNoEncontrado("Soporte no encontrado"));
+
+        Instant ahora = Instant.now();
+        if (aprobar) {
+            soporte.aprobar(administradorId, texto, ahora);
+        } else {
+            soporte.rechazar(administradorId, texto, ahora);
+        }
+        perfil.setNivelVerificacion(calcularNivel(perfil));
+        repositorio.save(tutor);
+
+        auditoria.registrarAccion(administradorId, aprobar ? "APROBAR_SOPORTE" : "RECHAZAR_SOPORTE",
+                ENTIDAD_USUARIO, detalle("usuarioId", usuarioId, "soporteId", soporteId,
+                        "tipo", soporte.getTipo() == null ? null : soporte.getTipo().name(),
+                        "observacion", texto, "nivelResultante", perfil.getNivelVerificacion().name()));
+        if (aprobar) {
+            notificaciones.notificar(usuarioId, TipoNotificacion.SOPORTE_APROBADO, "Soporte aprobado",
+                    "Tu soporte de verificación fue aprobado" + (perfil.getNivelVerificacion()
+                            == NivelVerificacion.VERIFICADO ? ": ya eres Tutor Verificado." : "."),
+                    "perfil.html");
+        } else {
+            notificaciones.notificar(usuarioId, TipoNotificacion.SOPORTE_RECHAZADO, "Soporte rechazado",
+                    "Tu soporte de verificación fue rechazado: " + texto, "perfil.html");
+        }
+        return UsuarioMapper.aSoporteDTO(soporte);
+    }
+
+    /** Listado paginado de usuarios con filtros opcionales por rol, estado y texto (nombre o correo). */
+    public Pagina<UsuarioAdminDTO> listarUsuarios(Rol rol, EstadoCuenta estado, String texto, int pagina,
+                                                  int tamano) {
+        PageRequest paginacion = PageRequest.of(Math.max(pagina, 0), Math.min(Math.max(tamano, 1), 100));
+        return Pagina.de(repositorio.buscar(rol, estado, texto, paginacion), UsuarioMapper::aUsuarioAdminDTO);
+    }
+
+    /** Suspende, bloquea o reactiva una cuenta. No se puede actuar sobre la propia ni sobre otro administrador. */
+    public UsuarioAdminDTO cambiarEstadoCuenta(String administradorId, String usuarioId, EstadoCuenta nuevoEstado,
+                                               String motivo) {
+        if (administradorId.equals(usuarioId)) {
+            throw new ExcepcionNegocio("No puede cambiar el estado de su propia cuenta");
+        }
+        Usuario usuario = buscar(usuarioId);
+        if (usuario.tieneRol(Rol.ADMINISTRADOR)) {
+            throw new ExcepcionNegocio("No se puede cambiar el estado de una cuenta de administrador");
+        }
+        String texto = motivo == null || motivo.isBlank() ? null : motivo.trim();
+        if (nuevoEstado != EstadoCuenta.ACTIVA && texto == null) {
+            throw new ExcepcionNegocio("Debe indicar el motivo al suspender o bloquear una cuenta");
+        }
+        EstadoCuenta anterior = usuario.getEstadoCuenta();
+        usuario.setEstadoCuenta(nuevoEstado);
+        Usuario guardado = repositorio.save(usuario);
+        auditoria.registrarAccion(administradorId, "CAMBIAR_ESTADO_CUENTA", ENTIDAD_USUARIO,
+                detalle("usuarioId", usuarioId, "estadoAnterior", anterior.name(),
+                        "estadoNuevo", nuevoEstado.name(), "motivo", texto));
+        return UsuarioMapper.aUsuarioAdminDTO(guardado);
+    }
+
+    private static SoporteColaDTO aElementoCola(Usuario usuario, SoporteVerificacion soporte) {
+        boolean institucional = usuario.getCorreo().endsWith(SUFIJO_CORREO_INSTITUCIONAL);
+        return new SoporteColaDTO(usuario.getId(), usuario.getNombre(), usuario.getCorreo(),
+                institucional ? PrioridadVerificacion.ALTA : PrioridadVerificacion.NORMAL,
+                institucional ? "Correo institucional " + SUFIJO_CORREO_INSTITUCIONAL : null,
+                UsuarioMapper.aSoporteDTO(soporte));
+    }
+
+    /** VERIFICADO si hay algún soporte aprobado; si no, EN_REVISION mientras quede alguno pendiente. */
+    private static NivelVerificacion calcularNivel(PerfilTutor perfil) {
+        if (perfil.getSoportes().stream().anyMatch(s -> s.getEstado() == EstadoSoporte.APROBADO)) {
+            return NivelVerificacion.VERIFICADO;
+        }
+        return perfil.tieneSoportePendiente() ? NivelVerificacion.EN_REVISION : NivelVerificacion.NO_VERIFICADO;
     }
 
     /** Añade el rol ESTUDIANTE o TUTOR a una cuenta existente (un usuario puede tener ambos). */

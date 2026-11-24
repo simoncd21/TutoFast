@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Administración · TutoFast</title>
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/estilos.css">
+  <script>
+    // Aplica el tema guardado antes de pintar para evitar parpadeos.
+    (function () {
+      var t = localStorage.getItem('tutofast_tema');
+      if (t !== 'light' && t !== 'dark') {
+        t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  <header class="navbar" data-encabezado></header>
+
+  <main class="seccion">
+    <div class="contenedor admin">
+      <h1>Administración</h1>
+      <div id="aviso" class="alerta" role="status" hidden></div>
+      <p id="cargando" class="texto-suave">Cargando el panel…</p>
+
+      <div id="contenido" hidden>
+        <div class="pestanas pestanas--admin" role="tablist" aria-label="Secciones de administración">
+          <button class="pestana" type="button" role="tab" id="pestana-catalogos" aria-controls="panel-catalogos" aria-selected="true">Catálogos</button>
+          <button class="pestana" type="button" role="tab" id="pestana-comision" aria-controls="panel-comision" aria-selected="false" tabindex="-1">Comisión</button>
+          <button class="pestana" type="button" role="tab" id="pestana-verificacion" aria-controls="panel-verificacion" aria-selected="false" tabindex="-1">Verificación de tutores</button>
+          <button class="pestana" type="button" role="tab" id="pestana-usuarios" aria-controls="panel-usuarios" aria-selected="false" tabindex="-1">Usuarios</button>
+          <button class="pestana" type="button" role="tab" id="pestana-auditoria" aria-controls="panel-auditoria" aria-selected="false" tabindex="-1">Auditoría</button>
+        </div>
+
+        <!-- Catálogos -->
+        <section id="panel-catalogos" class="admin__panel" role="tabpanel" aria-labelledby="pestana-catalogos">
+          <div class="tarjeta">
+            <h2>Catálogo académico</h2>
+            <p class="texto-suave">Elige la universidad, la facultad y el programa donde quieres trabajar. Los elementos desactivados dejan de aparecer en el registro y en las solicitudes.</p>
+            <div class="rejilla-form">
+              <div class="campo">
+                <label for="cat-universidad">Universidad</label>
+                <select id="cat-universidad"></select>
+              </div>
+              <div class="campo">
+                <label for="cat-facultad">Facultad</label>
+                <select id="cat-facultad" disabled></select>
+              </div>
+            </div>
+            <div class="campo">
+              <label for="cat-programa">Programa académico</label>
+              <select id="cat-programa" disabled></select>
+            </div>
+          </div>
+
+          <div class="tarjeta" aria-labelledby="cat-universidades-titulo">
+            <h3 id="cat-universidades-titulo">Universidades</h3>
+            <div class="tabla-contenedor"><table class="tabla" id="tabla-universidades"></table></div>
+            <form class="admin__formulario" id="form-universidad" novalidate>
+              <div class="campo">
+                <label for="nueva-universidad">Nueva universidad</label>
+                <input type="text" id="nueva-universidad" name="nombre" maxlength="120" required>
+                <div class="campo__error" data-error-de="nombre" hidden></div>
+              </div>
+              <div class="campo"><button class="btn btn--primario" type="submit">Agregar universidad</button></div>
+            </form>
+          </div>
+
+          <div class="tarjeta" aria-labelledby="cat-facultades-titulo">
+            <h3 id="cat-facultades-titulo">Facultades</h3>
+            <p id="vacio-facultades" class="texto-suave">Elige una universidad para ver sus facultades.</p>
+            <div class="tabla-contenedor" id="contenedor-facultades" hidden><table class="tabla" id="tabla-facultades"></table></div>
+            <form class="admin__formulario" id="form-facultad" novalidate hidden>
+              <div class="campo">
+                <label for="nueva-facultad">Nueva facultad</label>
+                <input type="text" id="nueva-facultad" name="nombre" maxlength="120" required>
+                <div class="campo__error" data-error-de="nombre" hidden></div>
+              </div>
+              <div class="campo"><button class="btn btn--primario" type="submit">Agregar facultad</button></div>
+            </form>
+          </div>
+
+          <div class="tarjeta" aria-labelledby="cat-programas-titulo">
+            <h3 id="cat-programas-titulo">Programas académicos</h3>
+            <p id="vacio-programas" class="texto-suave">Elige una facultad para ver sus programas.</p>
+            <div class="tabla-contenedor" id="contenedor-programas" hidden><table class="tabla" id="tabla-programas"></table></div>
+            <form class="admin__formulario" id="form-programa" novalidate hidden>
+              <div class="campo">
+                <label for="nuevo-programa">Nuevo programa</label>
+                <input type="text" id="nuevo-programa" name="nombre" maxlength="120" required>
+                <div class="campo__error" data-error-de="nombre" hidden></div>
+              </div>
+              <div class="campo"><button class="btn btn--primario" type="submit">Agregar programa</button></div>
+            </form>
+          </div>
+
+          <div class="tarjeta" aria-labelledby="cat-asignaturas-titulo">
+            <h3 id="cat-asignaturas-titulo">Asignaturas</h3>
+            <p id="vacio-asignaturas" class="texto-suave">Elige un programa para ver sus asignaturas.</p>
+            <div class="tabla-contenedor" id="contenedor-asignaturas" hidden><table class="tabla" id="tabla-asignaturas"></table></div>
+            <form class="admin__formulario" id="form-asignatura" novalidate hidden>
+              <div class="campo">
+                <label for="nueva-asignatura-codigo">Código</label>
+                <input type="text" id="nueva-asignatura-codigo" name="codigo" maxlength="20" placeholder="IS-204" required>
+                <div class="campo__error" data-error-de="codigo" hidden></div>
+              </div>
+              <div class="campo">
+                <label for="nueva-asignatura-nombre">Nombre</label>
+                <input type="text" id="nueva-asignatura-nombre" name="nombre" maxlength="120" required>
+                <div class="campo__error" data-error-de="nombre" hidden></div>
+              </div>
+              <div class="campo"><button class="btn btn--primario" type="submit">Agregar asignatura</button></div>
+            </form>
+          </div>
+        </section>
+
+        <!-- Comisión -->
+        <section id="panel-comision" class="admin__panel" role="tabpanel" aria-labelledby="pestana-comision" hidden>
+          <div class="tarjeta">
+            <h2>Comisión de la plataforma</h2>
+            <p class="texto-suave">Se descuenta del pago de cada tutoría. El cambio solo aplica a servicios que se confirmen desde ahora; los ya confirmados conservan su comisión.</p>
+            <p>Vigente: <span id="comision-vigente" class="comision-actual">—</span></p>
+            <p id="comision-desde" class="texto-suave"></p>
+            <form class="admin__formulario" id="form-comision" novalidate>
+              <div class="campo">
+                <label for="comision-nueva">Nuevo porcentaje (0 a 50)</label>
+                <input type="number" id="comision-nueva" name="porcentaje" min="0" max="50" step="0.1" inputmode="decimal" required>
+                <div class="campo__error" data-error-de="porcentaje" hidden></div>
+              </div>
+              <div class="campo"><button class="btn btn--primario" type="submit">Actualizar comisión</button></div>
+            </form>
+          </div>
+          <div class="tarjeta">
+            <h3>Historial</h3>
+            <div class="tabla-contenedor"><table class="tabla" id="tabla-comision"></table></div>
+          </div>
+        </section>
+
+        <!-- Verificación de tutores -->
+        <section id="panel-verificacion" class="admin__panel" role="tabpanel" aria-labelledby="pestana-verificacion" hidden>
+          <div class="tarjeta">
+            <div class="barra-acciones">
+              <h2>Verificación de tutores</h2>
+              <button class="btn btn--borde btn--pequeno" type="button" id="verificacion-recargar">Actualizar</button>
+            </div>
+            <p class="texto-suave">Los tutores con correo institucional (.edu.co) aparecen primero. Al aprobar un soporte el tutor pasa a «Tutor Verificado»; al rechazar debes indicar el motivo.</p>
+            <ul id="cola-verificacion" class="cola" aria-live="polite"></ul>
+            <p id="cola-vacia" class="texto-suave" hidden>No hay soportes pendientes de revisión.</p>
+          </div>
+        </section>
+
+        <!-- Usuarios -->
+        <section id="panel-usuarios" class="admin__panel" role="tabpanel" aria-labelledby="pestana-usuarios" hidden>
+          <div class="tarjeta">
+            <h2>Usuarios</h2>
+            <form class="admin__barra" id="filtros-usuarios" novalidate>
+              <div class="campo">
+                <label for="usr-q">Buscar por nombre o correo</label>
+                <input type="search" id="usr-q" name="q" maxlength="120">
+              </div>
+              <div class="campo">
+                <label for="usr-rol">Rol</label>
+                <select id="usr-rol" name="rol">
+                  <option value="">Todos</option>
+                  <option value="ESTUDIANTE">Estudiante</option>
+                  <option value="TUTOR">Tutor</option>
+                  <option value="ADMINISTRADOR">Administrador</option>
+                </select>
+              </div>
+              <div class="campo">
+                <label for="usr-estado">Estado</label>
+                <select id="usr-estado" name="estado">
+                  <option value="">Todos</option>
+                  <option value="ACTIVA">Activa</option>
+                  <option value="SUSPENDIDA">Suspendida</option>
+                  <option value="BLOQUEADA">Bloqueada</option>
+                </select>
+              </div>
+              <div class="campo"><button class="btn btn--primario" type="submit">Filtrar</button></div>
+            </form>
+            <div class="tabla-contenedor"><table class="tabla" id="tabla-usuarios"></table></div>
+            <p id="usuarios-vacio" class="texto-suave" hidden>No se encontraron usuarios con esos filtros.</p>
+            <div class="paginacion">
+              <button class="btn btn--borde btn--pequeno" type="button" id="usuarios-anterior">Anterior</button>
+              <span id="usuarios-pagina" class="texto-suave"></span>
+              <button class="btn btn--borde btn--pequeno" type="button" id="usuarios-siguiente">Siguiente</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Auditoría -->
+        <section id="panel-auditoria" class="admin__panel" role="tabpanel" aria-labelledby="pestana-auditoria" hidden>
+          <div class="tarjeta">
+            <h2>Auditoría</h2>
+            <form class="admin__barra" id="filtros-auditoria" novalidate>
+              <div class="campo">
+                <label for="aud-entidad">Entidad</label>
+                <select id="aud-entidad" name="entidad">
+                  <option value="">Todas</option>
+                  <option value="Usuario">Usuario</option>
+                  <option value="Universidad">Universidad</option>
+                  <option value="Facultad">Facultad</option>
+                  <option value="ProgramaAcademico">Programa académico</option>
+                  <option value="Asignatura">Asignatura</option>
+                  <option value="ParametroComision">Comisión</option>
+                </select>
+              </div>
+              <div class="campo">
+                <label for="aud-desde">Desde</label>
+                <input type="date" id="aud-desde" name="desde">
+              </div>
+              <div class="campo">
+                <label for="aud-hasta">Hasta</label>
+                <input type="date" id="aud-hasta" name="hasta">
+              </div>
+              <div class="campo"><button class="btn btn--primario" type="submit">Filtrar</button></div>
+            </form>
+            <div class="tabla-contenedor"><table class="tabla" id="tabla-auditoria"></table></div>
+            <p id="auditoria-vacia" class="texto-suave" hidden>No hay registros de auditoría con esos filtros.</p>
+            <div class="paginacion">
+              <button class="btn btn--borde btn--pequeno" type="button" id="auditoria-anterior">Anterior</button>
+              <span id="auditoria-pagina" class="texto-suave"></span>
+              <button class="btn btn--borde btn--pequeno" type="button" id="auditoria-siguiente">Siguiente</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="pie">
+    <div class="contenedor pie__interior">
+      <span>© <span id="anio"></span> TutoFast · Proyecto académico</span>
+      <span>Tutorías universitarias con precios negociables</span>
+    </div>
+  </footer>
+
+  <script type="module" src="js/paginas/admin.js"></script>
+</body>
+</html>

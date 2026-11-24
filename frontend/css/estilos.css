@@ -360,3 +360,42 @@ input[type="file"] {
   width: 100%; padding: 0.5rem; border: 1px dashed var(--borde); border-radius: var(--radio-md);
   background: var(--superficie); color: var(--texto); font: inherit;
 }
+
+/* ===== Asignaturas del tutor ===== */
+.asignaturas { display: grid; gap: var(--espacio-1); max-height: 220px; overflow-y: auto; margin-bottom: var(--espacio-2); }
+.asignaturas .casilla { margin: 0; }
+.fila-badges .badge { display: inline-flex; align-items: center; gap: var(--espacio-2); list-style: none; }
+ul.fila-badges { margin: var(--espacio-2) 0 0; padding: 0; }
+.badge__quitar {
+  border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; font-weight: 800;
+  line-height: 1; padding: 0 0.1rem;
+}
+.badge__quitar:hover { color: var(--error); }
+
+/* ===== Panel de administración ===== */
+.admin { max-width: 1040px; }
+.admin > h1 { margin-bottom: var(--espacio-5); }
+.pestanas--admin { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.admin__panel { display: grid; gap: var(--espacio-5); }
+.admin__barra { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--espacio-3); }
+.admin__barra .campo { margin: 0; flex: 1 1 180px; }
+.tabla-contenedor { overflow-x: auto; border: 1px solid var(--borde); border-radius: var(--radio-md); }
+.tabla { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.tabla th, .tabla td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid var(--borde); vertical-align: top; }
+.tabla th { background: var(--superficie-2); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--texto-suave); }
+.tabla tr:last-child td { border-bottom: 0; }
+.tabla td.acciones { white-space: nowrap; }
+.tabla .inactivo { color: var(--texto-suave); text-decoration: line-through; }
+.badge--prioridad { background: var(--advertencia-suave); color: var(--texto); border: 1px solid var(--advertencia); }
+.cola { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--espacio-3); }
+.cola__item {
+  display: grid; gap: var(--espacio-2); padding: var(--espacio-4);
+  border: 1px solid var(--borde); border-radius: var(--radio-md); background: var(--superficie-2);
+}
+.cola__item--prioridad { border-color: var(--advertencia); }
+.cola__cabecera { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--espacio-2); }
+.cola__acciones { display: flex; flex-wrap: wrap; gap: var(--espacio-2); align-items: center; }
+.cola__acciones input[type="text"] { flex: 1 1 220px; }
+.paginacion { display: flex; align-items: center; justify-content: space-between; gap: var(--espacio-3); }
+.comision-actual { font-size: 2.2rem; font-weight: 800; color: var(--color-primario); line-height: 1; }
+.admin__formulario { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 var(--espacio-4); align-items: end; }

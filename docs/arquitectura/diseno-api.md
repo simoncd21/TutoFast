@@ -117,7 +117,7 @@ Si MongoDB no responde: 503 con `"estado":"DEGRADADO","baseDatos":"DOWN"`. Rende
 ### 3.2 Auditoría de identidad y cliente web (módulo 03)
 - `ServicioAuditoria.registrarAccion(usuarioId, accion, entidad, detalle)` guarda en `registros_auditoria` (solo inserción; `usuarioId` nulo = acción del sistema) y `consultar(usuarioId, entidad, desde, hasta, paginacion)` devuelve los registros más recientes primero con filtros opcionales combinables. Nunca se guardan claves, tokens ni datos de tarjeta.
 - Acciones registradas por `ServicioIdentidad` (entidad `Usuario`): `REGISTRO_USUARIO`, `CONSENTIMIENTO_DATOS` (detalle `norma: "Ley 1581 de 2012"` y fecha), `INICIO_SESION`, `INICIO_SESION_FALLIDO` (solo si el correo existe), `ACTUALIZAR_PERFIL_ESTUDIANTE`, `ACTUALIZAR_PERFIL_TUTOR`, `ACTIVAR_ROL` y `SEED_ADMINISTRADOR`. Los intentos rechazados por validación o consentimiento no generan registro.
-- El endpoint de lectura (`GET /api/admin/auditoria`) se expone en el módulo de administración.
+- El endpoint de lectura (`GET /api/admin/auditoria`) se expone en el módulo de administración (sección 16).
 - Cliente web: `frontend/js/sesion.js` guarda el token y el usuario en `localStorage` (`tutofast_token`, `tutofast_usuario`, `tutofast_rol_activo`) y recarga el usuario con `GET /api/auth/yo` al abrir páginas privadas; ante 401/403 limpia la sesión y redirige a `acceso.html?siguiente=...`. El rol activo es solo de interfaz: el servidor valida siempre los roles reales del token.
 
 ---
@@ -193,6 +193,15 @@ Filtros: `programaId`, `asignaturaId`, `modalidad`, `disponibilidad` (texto), `c
 
 `{tipo}` ∈ `universidades | facultades | programas | asignaturas`.
 
+**Notas de implementación (módulo 05)**
+- Las consultas `GET /api/catalogos/**` son públicas (sin token); el alta, la edición y el borrado lógico exigen AD. Las listas aceptan `?soloActivas=true` (por defecto) o `false` (panel de administración).
+- Se añade `GET /api/catalogos/programas/{id}` → `{"programa","facultad","universidad"}` para precargar los selects encadenados.
+- `POST /api/catalogos/{tipo}` usa el mismo cuerpo para los cuatro tipos: `{"universidadId"|"facultadId"|"programaId", "codigo"?, "nombre"}` según el nivel. `PUT` solo cambia `nombre` (y `codigo` en asignaturas); no se mueve un elemento de padre. Los elementos desactivados conservan a sus hijos.
+- El código de asignatura se normaliza (mayúsculas, sin espacios) y es único por programa; nombres de universidad, facultad y programa son únicos dentro de su padre → 409 `DUPLICADO`. Padre inexistente → 404; falta el padre o el código → 400.
+- Los DTO del catálogo incluyen `activa`.
+- Acciones de auditoría: `CREAR_CATALOGO`, `EDITAR_CATALOGO`, `ACTIVAR_CATALOGO`, `DESACTIVAR_CATALOGO` (entidad `Universidad`, `Facultad`, `ProgramaAcademico` o `Asignatura`).
+- Seed idempotente al arrancar: «Universidad Demo TutoFast» → «Facultad de Ingeniería» → «Ingeniería de Sistemas» con `IS-101`, `IS-204`, `IS-210` e `IS-305`, y la comisión inicial del 10 %.
+
 ## 7. Comisión — `ComisionControlador`
 
 | Método y ruta | Rol | Cuerpo | Respuesta |
@@ -200,6 +209,8 @@ Filtros: `programaId`, `asignaturaId`, `modalidad`, `disponibilidad` (texto), `c
 | `GET /api/comision/vigente` | A | — | 200 `{"porcentaje":10.0,"vigenteDesde":"..."}` |
 | `PUT /api/comision` | AD | `{"porcentaje":12.0}` (0–50) | 200 nuevo `ComisionDTO`; solo se aplica a confirmaciones futuras |
 | `GET /api/comision/historial` | AD | — | 200 `[{"porcentaje","vigenteDesde","vigenteHasta","modificadoPor"}]` |
+
+Notas (módulo 05): `GET /vigente` devuelve 404 mientras no exista ninguna comisión (el seed crea la del 10 %). `PUT` valida 0–50 (400), cierra la vigente y activa la nueva (respeta el índice parcial único `uk_comision_vigente`; si la activación falla reabre la anterior) y responde 409 si el porcentaje es igual al vigente o si otro administrador la cambió al mismo tiempo. Auditoría: `CONFIGURAR_COMISION` (entidad `ParametroComision`, detalle con porcentaje anterior y nuevo) y `SEED_COMISION`.
 
 ---
 
@@ -434,6 +445,14 @@ Cola de verificación ordenada por `prioridad` (ALTA primero) y luego por `fecha
 - 200 `ReporteDTO` con `resolucion`.
 
 `RegistroAuditoriaDTO`: `{"id","usuarioId","usuarioNombre","accion","entidadAfectada","fecha","detalle"}`.
+
+**Notas de implementación (módulo 05, endpoints ya disponibles)**
+- `GET /api/admin/soportes?estado=` (por defecto `EN_REVISION`): un elemento por soporte. `motivoPrioridad` es `null` cuando la prioridad es `NORMAL`; el orden es prioridad ALTA primero y luego `fechaEnvio` ascendente.
+- `.../aprobar`: cuerpo opcional `{"observacion"}` (≤ 500). `.../rechazar`: `{"observacion"}` obligatoria (400 si falta). Ambos responden 200 con el `SoporteDTO` revisado; un soporte ya revisado → 409 `SOPORTE_YA_REVISADO`; usuario sin rol TUTOR o soporte inexistente → 404.
+- Nivel resultante: `VERIFICADO` si el tutor tiene algún soporte aprobado; si no, `EN_REVISION` mientras le quede alguno pendiente y `NO_VERIFICADO` en otro caso. Notificaciones `SOPORTE_APROBADO` / `SOPORTE_RECHAZADO` (con el motivo) y auditoría `APROBAR_SOPORTE` / `RECHAZAR_SOPORTE`.
+- `GET /api/admin/usuarios?rol=&estado=&q=&pagina=&tamano=`: `Pagina<UsuarioAdminDTO>` con `{"id","nombre","correo","roles","estadoCuenta","fechaRegistro","nivelVerificacion"}` (`q` busca en nombre y correo; más recientes primero; tamaño máximo 100).
+- `PATCH /api/admin/usuarios/{id}/estado`: `motivo` obligatorio para `SUSPENDIDA` y `BLOQUEADA`; no se puede actuar sobre la propia cuenta ni sobre otro administrador (422). Auditoría `CAMBIAR_ESTADO_CUENTA`. Una cuenta no activa deja de poder usar el token en la siguiente petición (403).
+- `GET /api/admin/auditoria`: `desde` y `hasta` son instantes ISO-8601 (`2026-12-01T00:00:00Z`); `usuarioNombre` es «Sistema» cuando `usuarioId` es nulo. Los endpoints de reportes, sanciones y mensajes reportados de esta tabla llegan en módulos posteriores.
 
 ---
 

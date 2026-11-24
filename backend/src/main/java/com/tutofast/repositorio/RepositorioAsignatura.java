@@ -11,4 +11,6 @@ public interface RepositorioAsignatura extends MongoRepository<Asignatura, Strin
     boolean existsByProgramaIdAndCodigo(String programaId, String codigo);
 
     List<Asignatura> findByProgramaIdAndActivaTrueOrderByNombreAsc(String programaId);
+
+    List<Asignatura> findByProgramaIdOrderByNombreAsc(String programaId);
 }

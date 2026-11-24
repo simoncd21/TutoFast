@@ -43,6 +43,24 @@
           <section class="tarjeta" id="seccion-ESTUDIANTE" aria-labelledby="estudiante-titulo" hidden>
             <h2 id="estudiante-titulo">Perfil de estudiante</h2>
             <form id="form-estudiante" novalidate>
+              <fieldset class="campo">
+                <legend>Programa académico</legend>
+                <div class="rejilla-form">
+                  <div class="campo">
+                    <label for="est-universidad">Universidad</label>
+                    <select id="est-universidad" name="universidadId"><option value="">Cargando…</option></select>
+                  </div>
+                  <div class="campo">
+                    <label for="est-facultad">Facultad</label>
+                    <select id="est-facultad" name="facultadId" disabled><option value="">Selecciona una facultad</option></select>
+                  </div>
+                </div>
+                <div class="campo">
+                  <label for="est-programa">Programa</label>
+                  <select id="est-programa" name="programaId" disabled><option value="">Selecciona un programa</option></select>
+                  <div class="campo__error" data-error-de="programaId" hidden></div>
+                </div>
+              </fieldset>
               <div class="campo">
                 <label for="est-semestre">Semestre actual</label>
                 <input type="number" id="est-semestre" name="semestre" min="1" max="14" inputmode="numeric" required>
@@ -101,6 +119,27 @@
                 <input type="text" id="tut-disponibilidad" name="disponibilidad" maxlength="200" placeholder="L-J 14:00-18:00">
                 <div class="campo__error" data-error-de="disponibilidad" hidden></div>
               </div>
+              <fieldset class="campo" id="tut-academico">
+                <legend>Asignaturas que dominas</legend>
+                <div class="rejilla-form">
+                  <div class="campo">
+                    <label for="tut-universidad">Universidad</label>
+                    <select id="tut-universidad"><option value="">Cargando…</option></select>
+                  </div>
+                  <div class="campo">
+                    <label for="tut-facultad">Facultad</label>
+                    <select id="tut-facultad" disabled><option value="">Selecciona una facultad</option></select>
+                  </div>
+                </div>
+                <div class="campo">
+                  <label for="tut-programa">Programa</label>
+                  <select id="tut-programa" disabled><option value="">Selecciona un programa</option></select>
+                </div>
+                <div id="tut-asignaturas-programa" class="asignaturas" aria-live="polite"></div>
+                <p class="campo__ayuda">Marca las asignaturas de cada programa; puedes combinar varios programas.</p>
+                <ul id="tut-asignaturas-elegidas" class="fila-badges" aria-label="Asignaturas elegidas"></ul>
+                <div class="campo__error" data-error-de="asignaturasDominadasIds" hidden></div>
+              </fieldset>
               <div class="campo">
                 <label for="tut-cuenta">Cuenta de cobro</label>
                 <input type="text" id="tut-cuenta" name="cuentaBancariaCobro" maxlength="120" autocomplete="off">

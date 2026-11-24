@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.tutofast.modelo.EstadoSoporte;
 import com.tutofast.modelo.Rol;
 import com.tutofast.modelo.Usuario;
 import com.tutofast.repositorio.RepositorioUsuario;
@@ -43,6 +44,10 @@ public final class RepositorioUsuarioEnMemoria {
                 .filter(u -> u.getPerfilTutor() != null && u.getPerfilTutor().getSoportes().stream()
                         .anyMatch(s -> inv.getArgument(0).equals(s.getRutaArchivo())))
                 .findFirst());
+        when(repo.findByPerfilTutorSoportesEstado(any(EstadoSoporte.class))).thenAnswer(inv -> almacen.values().stream()
+                .filter(u -> u.getPerfilTutor() != null && u.getPerfilTutor().getSoportes().stream()
+                        .anyMatch(s -> s.getEstado() == inv.<EstadoSoporte>getArgument(0)))
+                .toList());
         return repo;
     }
 

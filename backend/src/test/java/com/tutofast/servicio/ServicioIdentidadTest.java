@@ -6,6 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -38,6 +43,9 @@ import com.tutofast.modelo.RegistroAuditoria;
 import com.tutofast.modelo.Rol;
 import com.tutofast.modelo.TipoTutor;
 import com.tutofast.modelo.Usuario;
+import com.tutofast.integracion.puertos.INotificador;
+import com.tutofast.integracion.puertos.TipoNotificacion;
+import com.tutofast.repositorio.RepositorioNotificacion;
 import com.tutofast.repositorio.RepositorioUsuario;
 import com.tutofast.seguridad.JwtUtil;
 
@@ -47,6 +55,7 @@ class ServicioIdentidadTest {
     private final BCryptPasswordEncoder codificador = new BCryptPasswordEncoder(4);
     private final List<RegistroAuditoria> bitacora = new ArrayList<>();
     private final AlmacenamientoEnMemoria almacenamiento = new AlmacenamientoEnMemoria();
+    private final INotificador notificador = mock(INotificador.class);
     private RepositorioUsuario repoUsuarios;
     private ServicioIdentidad servicio;
 
@@ -55,8 +64,9 @@ class ServicioIdentidadTest {
         repoUsuarios = RepositorioUsuarioEnMemoria.crear(almacen);
         servicio = new ServicioIdentidad(repoUsuarios, codificador,
                 new JwtUtil("secreto-de-prueba-con-mas-de-32-caracteres-ok", Duration.ofHours(8)),
-                new ServicioAuditoria(RepositorioAuditoriaEnMemoria.crear(bitacora)),
-                new ServicioArchivos(almacenamiento, List.of(new ContextoSoportesVerificacion(repoUsuarios))));
+                com.tutofast.RepositorioAuditoriaEnMemoria.servicio(bitacora),
+                new ServicioArchivos(almacenamiento, List.of(new ContextoSoportesVerificacion(repoUsuarios))),
+                new ServicioNotificaciones(notificador, mock(RepositorioNotificacion.class)));
     }
 
     private List<String> acciones() {
@@ -389,5 +399,156 @@ class ServicioIdentidadTest {
         assertEquals(2, lista.size());
         assertEquals(TipoSoporte.CARNE_ESTUDIANTIL, lista.get(0).tipo());
         assertEquals("historial.docx", lista.get(1).nombreArchivo());
+    }
+
+    // ---- verificación de tutores y administración (módulo 05) ----
+
+    private String registrarTutorCon(String correo, String documento) {
+        String id = servicio.registrarUsuario(registro(correo, documento, Rol.TUTOR, true)).usuarioId();
+        servicio.subirSoporte(id, TipoSoporte.CERTIFICADO_MONITORIA, ArchivosDePrueba.pdf());
+        return id;
+    }
+
+    private String crearAdmin() {
+        servicio.crearAdministradorSiNoExiste("admin@tutofast.co", "Admin#2026");
+        return almacen.values().stream().filter(u -> u.tieneRol(Rol.ADMINISTRADOR)).findFirst().orElseThrow().getId();
+    }
+
+    @Test
+    void laColaPriorizaLosCorreosEduCoAunqueSeanMasRecientes() {
+        String normal = registrarTutorCon("tutor@gmail.com", "1000000001");
+        String institucional = registrarTutorCon("laura@universidad.edu.co", "1000000002");
+        String otroNormal = registrarTutorCon("otro@hotmail.com", "1000000003");
+
+        var cola = servicio.consultarColaVerificacion(EstadoSoporte.EN_REVISION);
+
+        assertEquals(3, cola.size());
+        assertEquals(institucional, cola.get(0).usuarioId());
+        assertEquals(com.tutofast.modelo.PrioridadVerificacion.ALTA, cola.get(0).prioridad());
+        assertEquals("Correo institucional .edu.co", cola.get(0).motivoPrioridad());
+        assertEquals(List.of(normal, otroNormal), List.of(cola.get(1).usuarioId(), cola.get(2).usuarioId()));
+        assertEquals(com.tutofast.modelo.PrioridadVerificacion.NORMAL, cola.get(1).prioridad());
+        assertEquals(null, cola.get(1).motivoPrioridad());
+    }
+
+    @Test
+    void laColaSoloMuestraLosSoportesDelEstadoPedido() {
+        String id = registrarTutorCon("tutor@universidad.edu.co", "1000000001");
+        String admin = crearAdmin();
+        String soporteId = almacen.get(id).getPerfilTutor().getSoportes().get(0).getId();
+        servicio.verificarTutor(admin, id, soporteId, true, null);
+
+        assertTrue(servicio.consultarColaVerificacion(EstadoSoporte.EN_REVISION).isEmpty());
+        assertEquals(1, servicio.consultarColaVerificacion(EstadoSoporte.APROBADO).size());
+    }
+
+    @Test
+    void aprobarUnSoporteDejaAlTutorVerificadoYLoNotifica() {
+        String id = registrarTutorCon("tutor@universidad.edu.co", "1000000001");
+        String admin = crearAdmin();
+        String soporteId = almacen.get(id).getPerfilTutor().getSoportes().get(0).getId();
+
+        var resultado = servicio.verificarTutor(admin, id, soporteId, true, "Certificado válido");
+
+        assertEquals(EstadoSoporte.APROBADO, resultado.estado());
+        assertEquals("Certificado válido", resultado.observacion());
+        var perfil = almacen.get(id).getPerfilTutor();
+        assertEquals(NivelVerificacion.VERIFICADO, perfil.getNivelVerificacion());
+        assertEquals(admin, perfil.getSoportes().get(0).getRevisadoPor());
+        assertNotNull(perfil.getSoportes().get(0).getFechaRevision());
+        assertTrue(acciones().contains("APROBAR_SOPORTE"));
+        verify(notificador).notificar(eq(id), eq(TipoNotificacion.SOPORTE_APROBADO), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void rechazarExigeObservacionYDejaAlTutorSinVerificar() {
+        String id = registrarTutorCon("tutor@gmail.com", "1000000001");
+        String admin = crearAdmin();
+        String soporteId = almacen.get(id).getPerfilTutor().getSoportes().get(0).getId();
+
+        assertThrows(ExcepcionNegocio.class, () -> servicio.verificarTutor(admin, id, soporteId, false, "  "));
+        assertEquals(NivelVerificacion.EN_REVISION, almacen.get(id).getPerfilTutor().getNivelVerificacion());
+
+        var resultado = servicio.verificarTutor(admin, id, soporteId, false, "Documento ilegible");
+
+        assertEquals(EstadoSoporte.RECHAZADO, resultado.estado());
+        assertEquals(NivelVerificacion.NO_VERIFICADO, almacen.get(id).getPerfilTutor().getNivelVerificacion());
+        assertTrue(acciones().contains("RECHAZAR_SOPORTE"));
+        verify(notificador).notificar(eq(id), eq(TipoNotificacion.SOPORTE_RECHAZADO), anyString(),
+                org.mockito.ArgumentMatchers.contains("Documento ilegible"), anyString());
+    }
+
+    @Test
+    void rechazarUnSoporteConOtroPendienteMantieneEnRevision() {
+        String id = registrarTutorCon("tutor@gmail.com", "1000000001");
+        servicio.subirSoporte(id, TipoSoporte.CARNE_ESTUDIANTIL, ArchivosDePrueba.png());
+        String admin = crearAdmin();
+        String primero = almacen.get(id).getPerfilTutor().getSoportes().get(0).getId();
+
+        servicio.verificarTutor(admin, id, primero, false, "No corresponde");
+
+        assertEquals(NivelVerificacion.EN_REVISION, almacen.get(id).getPerfilTutor().getNivelVerificacion());
+    }
+
+    @Test
+    void unSoporteYaRevisadoNoSePuedeRevisarDeNuevo() {
+        String id = registrarTutorCon("tutor@gmail.com", "1000000001");
+        String admin = crearAdmin();
+        String soporteId = almacen.get(id).getPerfilTutor().getSoportes().get(0).getId();
+        servicio.verificarTutor(admin, id, soporteId, true, null);
+
+        var e = assertThrows(ExcepcionNegocio.class, () -> servicio.verificarTutor(admin, id, soporteId, false, "tarde"));
+
+        assertEquals(HttpStatus.CONFLICT, e.getEstado());
+        assertEquals(NivelVerificacion.VERIFICADO, almacen.get(id).getPerfilTutor().getNivelVerificacion());
+    }
+
+    @Test
+    void verificarUnSoporteInexistenteOUnNoTutorDa404() {
+        String id = registrarTutorCon("tutor@gmail.com", "1000000001");
+        String estudiante = servicio.registrarUsuario(registro("est@u.edu.co", "1000000009", Rol.ESTUDIANTE, true))
+                .usuarioId();
+        String admin = crearAdmin();
+
+        assertThrows(com.tutofast.excepcion.ExcepcionNoEncontrado.class,
+                () -> servicio.verificarTutor(admin, id, "no-existe", true, null));
+        assertThrows(com.tutofast.excepcion.ExcepcionNoEncontrado.class,
+                () -> servicio.verificarTutor(admin, estudiante, "x", true, null));
+    }
+
+    @Test
+    void cambiarElEstadoDeUnaCuentaLoAudita() {
+        String id = registrarTutorCon("tutor@gmail.com", "1000000001");
+        String admin = crearAdmin();
+
+        var suspendida = servicio.cambiarEstadoCuenta(admin, id, EstadoCuenta.SUSPENDIDA, "Reporte de fraude");
+
+        assertEquals(EstadoCuenta.SUSPENDIDA, suspendida.estadoCuenta());
+        assertEquals(EstadoCuenta.SUSPENDIDA, almacen.get(id).getEstadoCuenta());
+        assertTrue(acciones().contains("CAMBIAR_ESTADO_CUENTA"));
+        assertThrows(ExcepcionAutorizacion.class, () -> servicio.iniciarSesion(
+                new InicioSesionDTO("tutor@gmail.com", "Segura#2026")));
+
+        servicio.cambiarEstadoCuenta(admin, id, EstadoCuenta.ACTIVA, null);
+        assertEquals(EstadoCuenta.ACTIVA, almacen.get(id).getEstadoCuenta());
+    }
+
+    @Test
+    void noSePuedeSuspenderSinMotivoNiLaPropiaCuentaNiAOtroAdministrador() {
+        String id = registrarTutorCon("tutor@gmail.com", "1000000001");
+        String admin = crearAdmin();
+
+        assertThrows(ExcepcionNegocio.class,
+                () -> servicio.cambiarEstadoCuenta(admin, id, EstadoCuenta.BLOQUEADA, " "));
+        assertThrows(ExcepcionNegocio.class,
+                () -> servicio.cambiarEstadoCuenta(admin, admin, EstadoCuenta.SUSPENDIDA, "x"));
+        Usuario otroAdmin = new Usuario();
+        otroAdmin.setId("bbbbbbbbbbbbbbbbbbbbbbbb");
+        otroAdmin.setCorreo("admin2@tutofast.co");
+        otroAdmin.setRoles(new java.util.LinkedHashSet<>(List.of(Rol.ADMINISTRADOR)));
+        almacen.put(otroAdmin.getId(), otroAdmin);
+        assertThrows(ExcepcionNegocio.class,
+                () -> servicio.cambiarEstadoCuenta(admin, otroAdmin.getId(), EstadoCuenta.SUSPENDIDA, "x"));
+        assertEquals(EstadoCuenta.ACTIVA, almacen.get(id).getEstadoCuenta());
     }
 }

@@ -60,9 +60,11 @@ class AutenticacionControladorTest {
         ServicioIdentidad servicio = new ServicioIdentidad(repoUsuarios,
                 new BCryptPasswordEncoder(4),
                 new JwtUtil("secreto-de-prueba-con-mas-de-32-caracteres-ok", Duration.ofHours(8)),
-                new com.tutofast.servicio.ServicioAuditoria(
-                        com.tutofast.RepositorioAuditoriaEnMemoria.crear(new java.util.ArrayList<>())),
-                new com.tutofast.servicio.ServicioArchivos(new com.tutofast.AlmacenamientoEnMemoria(), java.util.List.of()));
+                com.tutofast.RepositorioAuditoriaEnMemoria.servicio(new java.util.ArrayList<>()),
+                new com.tutofast.servicio.ServicioArchivos(new com.tutofast.AlmacenamientoEnMemoria(), java.util.List.of()),
+                new com.tutofast.servicio.ServicioNotificaciones(
+                        mock(com.tutofast.integracion.puertos.INotificador.class),
+                        mock(com.tutofast.repositorio.RepositorioNotificacion.class)));
 
         MongoTemplate plantilla = mock(MongoTemplate.class);
         MongoDatabase bd = mock(MongoDatabase.class);

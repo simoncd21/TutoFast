@@ -68,10 +68,6 @@ class ArchivosYNotificacionesControladorTest {
         var repoUsuarios = RepositorioUsuarioEnMemoria.crear(usuarios);
         var archivos = new ServicioArchivos(new AlmacenamientoEnMemoria(),
                 List.of(new ContextoSoportesVerificacion(repoUsuarios)));
-        identidad = new ServicioIdentidad(repoUsuarios, new BCryptPasswordEncoder(4),
-                new JwtUtil("secreto-de-prueba-con-mas-de-32-caracteres-ok", Duration.ofHours(8)),
-                new ServicioAuditoria(RepositorioAuditoriaEnMemoria.crear(new ArrayList<>())), archivos);
-
         RepositorioNotificacion repoNot = mock(RepositorioNotificacion.class);
         when(repoNot.save(any(DocumentoNotificacion.class))).thenAnswer(inv -> {
             DocumentoNotificacion n = inv.getArgument(0);
@@ -90,6 +86,11 @@ class ArchivosYNotificacionesControladorTest {
             return new PageImpl<>(propias, inv.getArgument(1), propias.size());
         });
         var servicioNot = new ServicioNotificaciones(new AdaptadorNotificaciones(repoNot), repoNot);
+        identidad = new ServicioIdentidad(repoUsuarios, new BCryptPasswordEncoder(4),
+                new JwtUtil("secreto-de-prueba-con-mas-de-32-caracteres-ok", Duration.ofHours(8)),
+                com.tutofast.RepositorioAuditoriaEnMemoria.servicio(new ArrayList<>()), archivos,
+                servicioNot);
+
 
         mvc = MockMvcBuilders
                 .standaloneSetup(new UsuarioControlador(identidad), new ArchivoControlador(archivos),

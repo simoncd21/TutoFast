@@ -13,7 +13,11 @@ const ENLACES_PUBLICOS = [
 const ENLACES_POR_ROL = {
   ESTUDIANTE: [{ texto: 'Inicio', href: 'index.html' }, { texto: 'Mi perfil', href: 'perfil.html' }],
   TUTOR: [{ texto: 'Inicio', href: 'index.html' }, { texto: 'Mi perfil', href: 'perfil.html' }],
-  ADMINISTRADOR: [{ texto: 'Inicio', href: 'index.html' }, { texto: 'Mi perfil', href: 'perfil.html' }],
+  ADMINISTRADOR: [
+    { texto: 'Inicio', href: 'index.html' },
+    { texto: 'Administración', href: 'admin.html' },
+    { texto: 'Mi perfil', href: 'perfil.html' },
+  ],
 };
 
 function elemento(etiqueta, clase, texto) {

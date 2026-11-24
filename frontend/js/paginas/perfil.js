@@ -2,6 +2,7 @@
 import { iniciarEncabezado } from '../componentes/encabezado.js';
 import { exito, error as toastError } from '../componentes/alertas.js';
 import { api, ErrorApi, descargarArchivo } from '../servicios/api.js';
+import { enlazarSelectsAcademicos, listarAsignaturas, consultarAsignatura } from '../servicios/catalogo.js';
 import { crearElementoNotificacion, avisarCambioNotificaciones, EVENTO_NOTIFICACIONES } from '../componentes/campana.js';
 import { exigirSesion, refrescarUsuario, rolActivo, ETIQUETA_ROL } from '../sesion.js';
 
@@ -29,8 +30,100 @@ const ESTADO_SOPORTE = {
   RECHAZADO: { texto: 'Rechazado', clase: 'badge--error' },
 };
 
-// Campos que el formulario no edita todavía (se necesita el catálogo del módulo 04): se conservan tal cual.
 let perfilActual = null;
+
+// ---- Selects académicos (catálogo) ----
+const selectsEstudiante = enlazarSelectsAcademicos({
+  universidad: document.getElementById('est-universidad'),
+  facultad: document.getElementById('est-facultad'),
+  programa: document.getElementById('est-programa'),
+});
+
+// Asignaturas que domina el tutor: id → { codigo, nombre }. Se pueden combinar varios programas.
+const asignaturasElegidas = new Map();
+const contenedorAsignaturas = document.getElementById('tut-asignaturas-programa');
+const listaElegidas = document.getElementById('tut-asignaturas-elegidas');
+let programaTutorMostrado = '';
+
+const etiquetaAsignatura = (a) => (a.codigo ? `${a.codigo} · ${a.nombre}` : a.nombre);
+
+function pintarAsignaturasElegidas() {
+  listaElegidas.replaceChildren(...[...asignaturasElegidas.entries()].map(([id, a]) => {
+    const item = document.createElement('li');
+    item.className = 'badge badge--info';
+    const texto = document.createElement('span');
+    texto.textContent = etiquetaAsignatura(a);
+    const quitar = document.createElement('button');
+    quitar.type = 'button';
+    quitar.className = 'badge__quitar';
+    quitar.textContent = '×';
+    quitar.setAttribute('aria-label', `Quitar ${etiquetaAsignatura(a)}`);
+    quitar.addEventListener('click', () => {
+      asignaturasElegidas.delete(id);
+      pintarAsignaturasElegidas();
+      const casilla = contenedorAsignaturas.querySelector(`input[value="${CSS.escape(id)}"]`);
+      if (casilla) casilla.checked = false;
+    });
+    item.append(texto, quitar);
+    return item;
+  }));
+}
+
+async function mostrarAsignaturasDelPrograma(programaId) {
+  programaTutorMostrado = programaId;
+  if (!programaId) { contenedorAsignaturas.replaceChildren(); return; }
+  try {
+    const asignaturas = await listarAsignaturas(programaId);
+    if (programaTutorMostrado !== programaId) return; // llegó tarde: la persona ya cambió de programa
+    if (asignaturas.length === 0) {
+      const vacio = document.createElement('p');
+      vacio.className = 'texto-suave';
+      vacio.textContent = 'Este programa aún no tiene asignaturas activas.';
+      contenedorAsignaturas.replaceChildren(vacio);
+      return;
+    }
+    contenedorAsignaturas.replaceChildren(...asignaturas.map((a) => {
+      const etiqueta = document.createElement('label');
+      etiqueta.className = 'casilla';
+      const casilla = document.createElement('input');
+      casilla.type = 'checkbox';
+      casilla.value = a.id;
+      casilla.checked = asignaturasElegidas.has(a.id);
+      casilla.addEventListener('change', () => {
+        if (casilla.checked) asignaturasElegidas.set(a.id, { codigo: a.codigo, nombre: a.nombre });
+        else asignaturasElegidas.delete(a.id);
+        pintarAsignaturasElegidas();
+      });
+      const texto = document.createElement('span');
+      texto.textContent = etiquetaAsignatura(a);
+      etiqueta.append(casilla, texto);
+      return etiqueta;
+    }));
+  } catch (err) {
+    toastError(err.message ?? 'No se pudieron cargar las asignaturas');
+  }
+}
+
+const selectsTutor = enlazarSelectsAcademicos({
+  universidad: document.getElementById('tut-universidad'),
+  facultad: document.getElementById('tut-facultad'),
+  programa: document.getElementById('tut-programa'),
+}, { alCambiarPrograma: mostrarAsignaturasDelPrograma });
+
+/** Carga el catálogo y resuelve el nombre de las asignaturas que el tutor ya tenía guardadas. */
+async function iniciarAcademicoTutor(ids) {
+  asignaturasElegidas.clear();
+  contenedorAsignaturas.replaceChildren();
+  selectsTutor.iniciar();
+  const resueltas = await Promise.allSettled(ids.map((id) => consultarAsignatura(id)));
+  ids.forEach((id, i) => {
+    const r = resueltas[i];
+    asignaturasElegidas.set(id, r.status === 'fulfilled'
+      ? { codigo: r.value.asignatura.codigo, nombre: r.value.asignatura.nombre }
+      : { codigo: '', nombre: 'Asignatura no disponible' });
+  });
+  pintarAsignaturasElegidas();
+}
 
 function mostrarAviso(mensaje, tipo = 'info') {
   aviso.textContent = mensaje;
@@ -106,6 +199,7 @@ function pintarDatos(p) {
 
 function pintarEstudiante(p) {
   formEstudiante.elements.semestre.value = p.perfilEstudiante?.semestre ?? '';
+  selectsEstudiante.iniciar(p.perfilEstudiante?.programaId ?? null);
 }
 
 function pintarTutor(p) {
@@ -154,6 +248,7 @@ function pintar(p) {
   if (p.roles.includes('ESTUDIANTE')) pintarEstudiante(p);
   if (p.roles.includes('TUTOR')) {
     pintarTutor(p);
+    iniciarAcademicoTutor(p.perfilTutor?.asignaturasDominadasIds ?? []);
     cargarSoportes();
   }
   document.getElementById('seccion-soportes').hidden = !p.roles.includes('TUTOR');
@@ -174,7 +269,7 @@ formEstudiante.addEventListener('submit', async (e) => {
     return;
   }
   const cuerpo = { semestre };
-  const programaId = perfilActual?.perfilEstudiante?.programaId;
+  const programaId = selectsEstudiante.programaId();
   if (programaId) cuerpo.programaId = programaId;
   try {
     const actualizado = await guardando(e.submitter ?? formEstudiante.querySelector('button'),
@@ -209,7 +304,7 @@ formTutor.addEventListener('submit', async (e) => {
     experiencia: f.experiencia.value.trim() || null,
     modalidades,
     disponibilidad: f.disponibilidad.value.trim() || null,
-    asignaturasDominadasIds: perfilActual?.perfilTutor?.asignaturasDominadasIds ?? [],
+    asignaturasDominadasIds: [...asignaturasElegidas.keys()],
     cuentaBancariaCobro: f.cuentaBancariaCobro.value.trim() || null,
   };
   try {

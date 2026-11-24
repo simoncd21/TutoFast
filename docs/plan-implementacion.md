@@ -106,17 +106,23 @@ Grafo de dependencias:
 
 ## Módulo 05 · `feature/05-catalogos-comision-admin`
 **Depende de:** 03, 04
-- [ ] `servicio/ServicioCatalogo` (`gestionarCatalogo`, `consultarCatalogo`, `configurarComision`, `consultarComision`).
-- [ ] `ServicioIdentidad.verificarTutor` + cola con **prioridad `.edu.co`**.
-- [ ] Controladores: CatalogoControlador, ComisionControlador, AdministracionControlador (soportes, usuarios, auditoría).
-- [ ] Endpoints: `/api/catalogos/**`, `/api/comision/**`, `GET /api/admin/soportes`, `POST /api/admin/usuarios/{u}/soportes/{s}/aprobar|rechazar`, `GET /api/admin/usuarios`, `PATCH /api/admin/usuarios/{id}/estado`, `GET /api/admin/auditoria`.
-- [ ] Seed: universidad, facultad, programa y asignaturas de demo + comisión del 10 %.
-- [ ] Frontend: `admin.html` (pestañas Catálogos, Comisión, Verificación de tutores con insignia "Correo institucional · Prioridad alta", Usuarios, Auditoría); selects encadenados de registro en `acceso.html`.
+- [x] `servicio/ServicioCatalogo` (`gestionarCatalogo`, `consultarCatalogo`, `configurarComision`, `consultarComision`; además `cambiarEstadoCatalogo`, `consultarAsignatura`, `consultarPrograma`, `consultarHistorialComision` y `sembrarDatosIniciales`).
+- [x] `ServicioIdentidad.verificarTutor` + `consultarColaVerificacion` con **prioridad `.edu.co`**; también `listarUsuarios` y `cambiarEstadoCuenta`; `ServicioAuditoria.consultarPagina` (con nombre del usuario).
+- [x] Controladores: CatalogoControlador, ComisionControlador, AdministracionControlador (soportes, usuarios, auditoría).
+- [x] Endpoints: `/api/catalogos/**`, `/api/comision/**`, `GET /api/admin/soportes`, `POST /api/admin/usuarios/{u}/soportes/{s}/aprobar|rechazar`, `GET /api/admin/usuarios`, `PATCH /api/admin/usuarios/{id}/estado`, `GET /api/admin/auditoria`.
+- [x] Seed (idempotente): universidad, facultad, programa y 4 asignaturas de demo (incluye `IS-204`) + comisión del 10 %.
+- [x] Frontend: `admin.html` + `js/paginas/admin.js` (pestañas Catálogos, Comisión, Verificación de tutores con insignia "Correo institucional · Prioridad alta", Usuarios, Auditoría; enlace «Administración» en el encabezado del rol ADMINISTRADOR); selects encadenados universidad → facultad → programa en `acceso.html` y `perfil.html`, y asignaturas dominadas del tutor en `perfil.html` (helper `js/servicios/catalogo.js`).
 
 **Pruebas**
-- [ ] `ServicioCatalogoTest`: IS-204 duplicado → 409; cambio de comisión cierra la vigente.
-- [ ] `ServicioIdentidadTest`: `.edu.co` primero en la cola; aprobar → VERIFICADO.
+- [x] `ServicioCatalogoTest`: IS-204 duplicado → 409; cambio de comisión cierra la vigente (con simulación del índice parcial único); seed idempotente.
+- [x] `ServicioIdentidadTest`: `.edu.co` primero en la cola; aprobar → VERIFICADO; rechazar exige observación; cuentas.
+- [x] `AdministracionControladorTest`: catálogo público sin sesión, gestión solo ADMINISTRADOR, validaciones 400/404.
 - [ ] Manual: el administrador crea una asignatura y la ve en el registro.
+
+**Notas de diseño**
+- El catálogo se consulta sin sesión (`GET /api/catalogos/**`, lo necesita el registro); el filtro JWT solo exime los GET. La gestión exige ADMINISTRADOR.
+- Cambio de comisión: primero se cierra la vigente y luego se inserta la nueva (respeta `uk_comision_vigente`); si la inserción falla se reabre la anterior. Repetir el porcentaje vigente → 409.
+- Un administrador no puede cambiar el estado de su propia cuenta ni el de otro administrador; suspender o bloquear exige motivo.
 
 ## Módulo 06 · `feature/06-solicitudes-busqueda`
 **Depende de:** 04, 05

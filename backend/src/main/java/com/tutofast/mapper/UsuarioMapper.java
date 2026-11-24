@@ -8,6 +8,7 @@ import com.tutofast.dto.PerfilEstudianteDTO;
 import com.tutofast.dto.PerfilTutorDTO;
 import com.tutofast.dto.PerfilTutorVistaDTO;
 import com.tutofast.dto.SoporteDTO;
+import com.tutofast.dto.UsuarioAdminDTO;
 import com.tutofast.dto.UsuarioDTO;
 import com.tutofast.modelo.NivelVerificacion;
 import com.tutofast.modelo.PerfilEstudiante;
@@ -23,6 +24,12 @@ public final class UsuarioMapper {
 
     public static UsuarioDTO aUsuarioDTO(Usuario u) {
         return new UsuarioDTO(u.getId(), u.getNombre(), u.getCorreo(), List.copyOf(u.getRoles()), u.getEstadoCuenta());
+    }
+
+    public static UsuarioAdminDTO aUsuarioAdminDTO(Usuario u) {
+        return new UsuarioAdminDTO(u.getId(), u.getNombre(), u.getCorreo(), List.copyOf(u.getRoles()),
+                u.getEstadoCuenta(), u.getFechaRegistro(),
+                u.getPerfilTutor() == null ? null : u.getPerfilTutor().getNivelVerificacion());
     }
 
     public static PerfilCompletoDTO aPerfilCompletoDTO(Usuario u) {

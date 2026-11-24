@@ -49,7 +49,7 @@ public class FiltroAutenticacionJwt extends OncePerRequestFilter {
             return true;
         }
         String ruta = rutaNormalizada(request);
-        return !ruta.startsWith("/api/") || RUTAS_PUBLICAS.contains(ruta);
+        return !ruta.startsWith("/api/") || RUTAS_PUBLICAS.contains(ruta) || esConsultaPublicaDeCatalogo(request, ruta);
     }
 
     @Override
@@ -73,6 +73,11 @@ public class FiltroAutenticacionJwt extends OncePerRequestFilter {
             return;
         }
         cadena.doFilter(request, response);
+    }
+
+    /** El catálogo académico se consulta sin sesión (lo necesita el formulario de registro); solo lecturas. */
+    private static boolean esConsultaPublicaDeCatalogo(HttpServletRequest request, String ruta) {
+        return HttpMethod.GET.matches(request.getMethod()) && ruta.startsWith("/api/catalogos/");
     }
 
     private static String rutaNormalizada(HttpServletRequest request) {

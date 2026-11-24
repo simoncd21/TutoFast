@@ -79,6 +79,22 @@
             <div class="campo__ayuda">Entre 8 y 64 caracteres, con al menos una letra y un número.</div>
             <div class="campo__error" data-error-de="clave" hidden></div>
           </div>
+          <fieldset class="campo" id="campos-academicos">
+            <legend>Tu programa académico <span class="texto-suave">(opcional)</span></legend>
+            <div class="campo">
+              <label for="registro-universidad">Universidad</label>
+              <select id="registro-universidad" name="universidadId"><option value="">Cargando…</option></select>
+            </div>
+            <div class="campo">
+              <label for="registro-facultad">Facultad</label>
+              <select id="registro-facultad" name="facultadId" disabled><option value="">Selecciona una facultad</option></select>
+            </div>
+            <div class="campo">
+              <label for="registro-programa">Programa académico</label>
+              <select id="registro-programa" name="programaId" disabled><option value="">Selecciona un programa</option></select>
+              <div class="campo__error" data-error-de="programaId" hidden></div>
+            </div>
+          </fieldset>
           <div class="campo" id="campo-semestre">
             <label for="registro-semestre">Semestre actual</label>
             <input type="number" id="registro-semestre" name="semestre" min="1" max="14" inputmode="numeric">

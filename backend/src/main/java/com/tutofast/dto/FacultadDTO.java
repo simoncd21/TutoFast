@@ -1,4 +1,5 @@
 package com.tutofast.dto;
 
-public record FacultadDTO(String id, String universidadId, String nombre) {
+public record FacultadDTO(String id, String universidadId, String nombre, boolean activa)
+        implements ElementoCatalogoDTO {
 }
