@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Servicios · TutoFast</title>
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/estilos.css">
+  <script>
+    // Aplica el tema guardado antes de pintar para evitar parpadeos.
+    (function () {
+      var t = localStorage.getItem('tutofast_tema');
+      if (t !== 'light' && t !== 'dark') {
+        t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  <header class="navbar" data-encabezado></header>
+
+  <main class="seccion">
+    <div class="contenedor admin solicitudes">
+      <h1 id="titulo-pagina">Mis servicios</h1>
+      <div id="aviso" class="alerta" role="status" hidden></div>
+      <p id="cargando" class="texto-suave">Cargando…</p>
+
+      <!-- Lista de servicios del usuario -->
+      <section id="vista-lista" hidden>
+        <div class="barra-acciones">
+          <div class="campo">
+            <label for="fil-estado">Estado</label>
+            <select id="fil-estado">
+              <option value="">Todos</option>
+              <option value="CONFIRMADO">Confirmado</option>
+              <option value="EN_DESARROLLO">En desarrollo</option>
+              <option value="FINALIZADO">Finalizado</option>
+              <option value="EN_REVISION">En revisión</option>
+              <option value="CANCELADO">Cancelado</option>
+            </select>
+          </div>
+        </div>
+        <div id="servicios" class="rejilla rejilla--3" aria-live="polite"></div>
+        <p id="servicios-vacio" class="texto-suave centrado" hidden>Todavía no tienes servicios confirmados. Cuando confirmes (o te confirmen) una tutoría aparecerá aquí.</p>
+      </section>
+
+      <!-- Ficha de un servicio -->
+      <section id="vista-detalle" class="servicio-detalle" hidden>
+        <div><a class="btn btn--borde btn--pequeno" id="volver" href="negociacion.html">← Mis servicios</a></div>
+        <div class="tarjeta" id="ficha"></div>
+        <div class="tarjeta" id="pago"></div>
+        <div class="tarjeta" id="acciones-servicio" hidden></div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="pie">
+    <div class="contenedor pie__interior">
+      <span>© <span id="anio"></span> TutoFast · Proyecto académico</span>
+      <span>Tutorías universitarias con precios negociables</span>
+    </div>
+  </footer>
+
+  <script type="module" src="js/paginas/negociacion.js"></script>
+</body>
+</html>

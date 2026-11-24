@@ -3,6 +3,7 @@
 // Todo el contenido dinámico se construye con textContent (nunca innerHTML).
 import { exito, error as toastError } from './alertas.js';
 import { api, ErrorApi } from '../servicios/api.js';
+import { abrirConfirmacionPago } from './confirmacion.js';
 
 export const ETIQUETA_TIPO_PROPUESTA = {
   ACEPTA_PRECIO: 'Acepta tu precio',
@@ -268,13 +269,20 @@ export async function montarPropuestas(contenedor, solicitud, { usuarioId, rol, 
   contenedor.appendChild(titulo);
 
   if (esDueno) {
-    pintarParaEstudiante(contenedor, propuestas, abierta, ejecutar);
+    pintarParaEstudiante(contenedor, solicitud, propuestas, abierta, ejecutar, recargar);
   } else {
     pintarParaTutor(contenedor, solicitud, propuestas, abierta, ejecutar);
+    if (solicitud.servicioId) contenedor.appendChild(enlaceServicio(solicitud.servicioId));
   }
 }
 
-function pintarParaEstudiante(contenedor, propuestas, abierta, ejecutar) {
+function enlaceServicio(servicioId) {
+  const a = el('a', 'btn btn--secundario btn--pequeno', 'Ver el servicio y el pago');
+  a.href = `negociacion.html?id=${encodeURIComponent(servicioId)}`;
+  return a;
+}
+
+function pintarParaEstudiante(contenedor, solicitud, propuestas, abierta, ejecutar, recargar) {
   if (!propuestas.length) {
     contenedor.appendChild(el('p', 'texto-suave', 'Aún no hay propuestas. Te avisaremos cuando un tutor responda.'));
     return;
@@ -302,7 +310,20 @@ function pintarParaEstudiante(contenedor, propuestas, abierta, ejecutar) {
       tarjeta.appendChild(el('p', 'texto-suave', `Esperando respuesta del tutor a tu contraoferta de ${pesos(p.contraofertaCOP)}.`));
     }
     if (p.estado === 'ACEPTADA') {
-      tarjeta.appendChild(el('p', 'texto-suave', 'Seleccionaste esta propuesta. El servicio se formaliza al confirmarlo con el pago.'));
+      const formalizada = solicitud.estado === 'FORMALIZADA';
+      tarjeta.appendChild(el('p', 'texto-suave', formalizada
+        ? 'Servicio confirmado: el pago quedó retenido hasta que finalice la tutoría.'
+        : 'Seleccionaste esta propuesta. El servicio se formaliza al confirmarlo con el pago.'));
+      const acciones = el('div', 'propuesta__acciones');
+      if (!formalizada && solicitud.estado === 'TUTOR_SELECCIONADO') {
+        acciones.appendChild(boton('Autorizar pago y confirmar', 'btn btn--primario btn--pequeno', () => abrirConfirmacionPago({
+          solicitud, propuesta: p,
+          alConfirmar: (servicio) => { exito('Tutoría confirmada y pago retenido'); window.location.href = `negociacion.html?id=${encodeURIComponent(servicio.id)}`; },
+          alFallar: () => recargar().catch(() => {}),
+        })));
+      }
+      if (solicitud.servicioId) acciones.appendChild(enlaceServicio(solicitud.servicioId));
+      if (acciones.children.length) tarjeta.appendChild(acciones);
     }
     if (abierta && p.estado === 'ENVIADA') {
       const acciones = el('div', 'propuesta__acciones');
@@ -350,7 +371,9 @@ function pintarParaTutor(contenedor, solicitud, propuestas, abierta, ejecutar) {
         `El estudiante propone ${pesos(activa.contraofertaCOP)}. Responde con una propuesta actualizada o retírala.`));
     }
     if (activa.estado === 'ACEPTADA') {
-      tarjeta.appendChild(el('p', 'texto-suave', 'El estudiante seleccionó tu propuesta; falta que confirme el servicio con el pago.'));
+      tarjeta.appendChild(el('p', 'texto-suave', solicitud.estado === 'FORMALIZADA'
+        ? 'El estudiante confirmó el servicio y el pago quedó retenido.'
+        : 'El estudiante seleccionó tu propuesta; falta que confirme el servicio con el pago.'));
     }
     if (abierta && activa.estado !== 'ACEPTADA') {
       const acciones = el('div', 'propuesta__acciones');

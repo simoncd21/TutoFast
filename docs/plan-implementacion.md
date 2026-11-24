@@ -160,14 +160,26 @@ El módulo se entrega en dos partes: **(A) propuestas y negociación**, hecha en
 - [x] `PropuestaControladorTest`: flujo completo envío → contraoferta → respuesta → selección, 401/403 por rol y por recurso, 400 de validación, 404 y 409.
 - [ ] Manual contra Atlas (con dos navegadores): el tutor propone, el estudiante contraoferta y la notificación llega a la campana en ≤ 30 s; revisar el aspecto en tema claro y oscuro.
 
-### Parte B · Confirmación y ciclo del servicio *(pendiente)*
-- [ ] `servicio/ServicioNegociacion` (`confirmarServicio` @Transactional, `iniciarSesion`; usará `ServicioPropuestas.descartarPropuestasDeSolicitud`).
-- [ ] `servicio/ServicioPagos` (`retenerFondos`, `calcularLiquidacion`).
-- [ ] Controlador: `NegociacionControlador`.
-- [ ] Endpoints: `POST /api/solicitudes/{id}/confirmar`, `GET /api/servicios/mios`, `GET /api/servicios/{id}`, `PATCH /api/servicios/{id}/enlace`, `POST /api/servicios/{id}/iniciar`.
-- [ ] `ProgramadorTareasConfig`: inicio automático CONFIRMADO → EN_DESARROLLO.
-- [ ] Frontend: `negociacion.html` (modal "Autorizar pago simulado y confirmar", ficha del servicio).
-- [ ] `ServicioNegociacionTest`: confirmar descarta las demás propuestas y congela `comisionPct`; `tok_rechazar` → 422 sin cambios de estado.
+### Parte B · Confirmación, pago simulado y ciclo del servicio *(rama `feature/07-confirmacion-pagos`)*
+- [x] `servicio/ServicioNegociacion`: `confirmarServicio` (`@Transactional`; reserva el servicio con el índice único, cobra, crea el pago, formaliza la solicitud y descarta las demás propuestas con `ServicioPropuestas.descartarPropuestasDeSolicitud`; compensa si algo falla), `listarMios`, `obtener`, `actualizarEnlace` e `iniciarSesion`.
+- [x] `servicio/ServicioPagos`: `retenerFondos` (cobro por `IPasarelaPago` con token opaco, comisión y neto con `BigDecimal` HALF_UP, `Pago` RETENIDO), `descartarPago`, `consultarLiquidacion` y `listarMios`. `liberarPago`, `reembolsar` y `congelar` siguen en el módulo 09.
+- [x] Controladores: `NegociacionControlador` y `PagoControlador` (sin lógica de negocio).
+- [x] Endpoints: `POST /api/solicitudes/{id}/confirmar`, `GET /api/servicios/mios`, `GET /api/servicios/{id}`, `PATCH /api/servicios/{id}/enlace`, `POST /api/servicios/{id}/iniciar`, `GET /api/pagos/servicio/{id}` y `GET /api/pagos/mios`.
+- [x] `ServicioDTO` ampliado (tema, participantes con nombre, resumen del pago) y `PagoResumenDTO`; el diseño de la API documenta códigos y errores.
+- [x] Frontend: `negociacion.html` + `js/paginas/negociacion.js` (lista de servicios, ficha con desglose del pago, lugar o enlace del tutor, inicio del servicio), `js/componentes/confirmacion.js` (modal «Autorizar pago simulado y confirmar», sin campos de tarjeta, con opción de simular el rechazo), botón «Autorizar pago y confirmar» en la propuesta seleccionada (`propuestas.js`), enlace «Servicios» en el encabezado de ESTUDIANTE y TUTOR y enlace de las notificaciones `SERVICIO_CONFIRMADO`.
+- [ ] `ProgramadorTareasConfig`: inicio automático CONFIRMADO → EN_DESARROLLO *(pendiente; se entrega con el cierre automático del módulo 09)*.
+- [ ] Cierre de los hilos de chat de los tutores no elegidos *(depende del módulo 08)*.
+
+**Pruebas (parte B)**
+- [x] `ServicioNegociacionTest` (26 casos): confirmar congela precio y `comisionPct`, descarta las demás propuestas y notifica a ambos; 40.000/10 %, 30.000/10 % y 33.333/12,5 % (HALF_UP); un cambio posterior de comisión no altera el servicio; `tok_rechazar` y token vacío → 422 `PAGO_RECHAZADO` sin cambios de estado y con reintento posible; segunda confirmación y carrera contra el índice único → 409 sin segundo cobro; solicitud no seleccionada, sin propuesta aceptada o tutor suspendido → 409; compensación si falla el guardado; dueño, rol, cuenta y 404; enlace (inmutables → 409), inicio y consultas por participante.
+- [x] `NegociacionControladorTest`: flujo por HTTP con el filtro JWT (200, 422, 409, 401/403 por rol y por recurso, 400 sin token de pago, 404), consulta de servicios y de pagos, y el token nunca aparece en la respuesta ni en el pago guardado. Se apoyan en `EscenarioNegociacion` (repositorios en memoria).
+- [x] Interfaz revisada en Edge headless contra una API simulada, en tema claro y oscuro (ficha, desglose, modal de pago con y sin rechazo, propuesta seleccionada).
+- [ ] Manual contra Atlas: confirmar con `tok_aprobar` deja servicio CONFIRMADO + pago RETENIDO y descarta la otra propuesta; con `tok_rechazar` no cambia nada; ambas notificaciones llegan a la campana.
+
+**Notas de diseño**
+- Orden anti doble cobro: primero se reserva el servicio (índice único `uk_servicio_solicitud`), después se cobra; así dos confirmaciones concurrentes nunca cobran dos veces. Si el cobro o un guardado posterior falla, se elimina la reserva (y el pago) y se restaura TUTOR_SELECCIONADO.
+- Un pago rechazado no deja rastro (ni siquiera auditoría), tal como describe el diseño de la API; con Atlas la transacción revertiría igualmente cualquier registro.
+- La comisión se lee de `ServicioCatalogo.consultarComision()` en el instante de confirmar y queda copiada en el servicio.
 
 ## Módulo 08 · `feature/08-mensajeria-chat`
 **Depende de:** 07, 04

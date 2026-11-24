@@ -47,8 +47,8 @@
 | ComisionControlador | `/api/comision` | ServicioCatalogo |
 | SolicitudControlador | `/api/solicitudes` | ServicioSolicitudes |
 | PropuestaControlador | `/api/solicitudes/{id}/propuestas`, `/api/propuestas` | ServicioPropuestas |
-| NegociacionControlador | `/api/solicitudes/{id}/confirmar`, `/api/servicios` | ServicioNegociacion *(pendiente)* |
-| PagoControlador | `/api/pagos` | ServicioPagos, ServicioNegociacion |
+| NegociacionControlador | `/api/solicitudes/{id}/confirmar`, `/api/servicios` | ServicioNegociacion |
+| PagoControlador | `/api/pagos` | ServicioPagos *(el cierre automático, con ServicioNegociacion, llega en el módulo 09)* |
 | MensajeControlador | `/api/solicitudes/{id}/mensajes`, `/api/mensajes` | ServicioMensajeria |
 | ArchivoControlador | `/api/archivos` | ServicioArchivos |
 | CalificacionControlador | `/api/servicios/{id}/calificaciones` | ServicioReputacion |
@@ -287,30 +287,47 @@ Filtros (R07): `universidadId`, `facultadId`, `programaId`, `asignaturaId`, `tem
 | `POST /api/propuestas/{id}/contraofertar` | E (dueño) | `{"precioCOP":27000,"nota":"¿Podría ser 27.000?"}` | estado CONTRAOFERTA_ESTUDIANTE y `contraofertaCOP`; el precio anterior queda en la auditoría (`PROPUESTA_CONTRAOFERTADA`); se notifica al tutor (`CONTRAOFERTA`, con la nota), que responde con `PUT`. 400 si el precio es ≤ 0 o > 5.000.000; 422 si es igual al precio propuesto; 409 si la propuesta no está ENVIADA o la solicitud ya no está abierta |
 | `POST /api/propuestas/{id}/seleccionar` | E (dueño) | — | propuesta ACEPTADA (provisional); solicitud TUTOR_SELECCIONADO; se notifica al tutor (`PROPUESTA_ACEPTADA`). 409 `CONTRAOFERTA_PENDIENTE` si la propuesta tiene una contraoferta sin responder; 409 si la solicitud ya tiene tutor seleccionado o no está abierta; 409 `TUTOR_NO_DISPONIBLE` si la cuenta del tutor dejó de estar activa |
 | `POST /api/propuestas/{id}/rechazar` | E (dueño) | opcional `{"motivo":"..."}` (hasta 300 caracteres) | DESCARTADA (`activa=false`); se notifica al tutor (`PROPUESTA_DESCARTADA`, con el motivo). 409 si ya estaba ACEPTADA, DESCARTADA o RETIRADA |
-| `POST /api/solicitudes/{id}/confirmar` | E (dueño) | `{"tokenPagoSimulado":"tok_aprobar"}` | ver abajo *(pendiente de implementar)* |
+| `POST /api/solicitudes/{id}/confirmar` | E (dueño) | `{"tokenPagoSimulado":"tok_aprobar"}` | ver abajo |
 
-`ServicioPropuestas` también ofrece `descartarPropuesta` y `descartarPropuestasDeSolicitud` (uso interno): la confirmación del servicio las usará para descartar las demás propuestas; la cancelación de la solicitud ya descarta las activas.
+`ServicioPropuestas` también ofrece `descartarPropuesta` y `descartarPropuestasDeSolicitud` (uso interno): la confirmación del servicio las usa para descartar las demás propuestas; la cancelación de la solicitud ya descarta las activas.
 
-### `POST /api/solicitudes/{id}/confirmar` · E
-Una sola transacción: verifica TUTOR_SELECCIONADO → copia la comisión vigente → `IPasarelaPago.retener` → crea `ServicioTutoria` (CONFIRMADO) y `Pago` (RETENIDO) → descarta las demás propuestas y cierra sus hilos de chat → solicitud FORMALIZADA → notifica a ambas partes.
+### `POST /api/solicitudes/{id}/confirmar` · E (dueño)
+Cuerpo: `{"tokenPagoSimulado":"tok_aprobar"}` — token **opaco** del simulador; obligatorio (400 `VALIDACION` si falta o está en blanco; máximo 64 caracteres). La plataforma nunca recibe, registra ni guarda datos de tarjeta: ni el token ni la respuesta ni la auditoría lo conservan. Con `tok_rechazar` (o cualquier token vacío) el simulador rechaza el pago.
+
+Una sola operación (`@Transactional` con Atlas; con el gestor no-op compensa a mano): verifica dueño y estado (TUTOR_SELECCIONADO con una propuesta ACEPTADA y el tutor activo) → lee la comisión vigente (`ServicioCatalogo.consultarComision`) → **reserva** el `ServicioTutoria` (CONFIRMADO, con precio, duración, modalidad y `comisionPct` congelados; el índice único `uk_servicio_solicitud` hace de cerrojo) → `IPasarelaPago.procesarPago` → crea el `Pago` (RETENIDO, con comisión y neto calculados con `BigDecimal`, HALF_UP a pesos enteros, guardados como `Decimal128`) → solicitud FORMALIZADA → descarta las demás propuestas (`PROPUESTA_DESCARTADA`) → auditoría y notificaciones. Si el pago se rechaza o algo falla, se elimina la reserva y la solicitud queda en TUTOR_SELECCIONADO, sin pago ni servicio. *(El cierre de los hilos de chat de los tutores no elegidos llega con el módulo 08.)*
 
 200 `ServicioDTO`:
 ```json
-{ "id": "6741...401", "solicitudId": "6741...201", "estudiante": {"id","nombre"}, "tutor": {"id","nombre"},
+{ "id": "6741...401", "solicitudId": "6741...201", "propuestaId": "6741...301", "tema": "Ecuaciones diferenciales",
+  "estudiante": {"id","nombre"}, "tutor": {"id","nombre"},
   "precioFinalCOP": 30000, "duracion": "MIN_90", "modalidad": "PRESENCIAL", "lugarOEnlace": "Biblioteca central, sala 3",
-  "fechaHora": "2026-12-05T19:00:00Z", "comisionPct": 10.0, "fechaConfirmacion": "...", "estado": "CONFIRMADO",
-  "pago": { "estado": "RETENIDO", "montoRetenidoCOP": 30000, "referencia": "SIM-..." } }
+  "fechaHora": "2026-12-05T19:00:00Z", "comisionPct": 10.0, "fechaConfirmacion": "...", "fechaInicio": null, "fechaFinalizacion": null,
+  "estado": "CONFIRMADO",
+  "pago": { "estado": "RETENIDO", "montoRetenidoCOP": 30000, "comisionCOP": 3000, "montoNetoCOP": 27000, "referencia": "SIM-..." } }
 ```
-- 422 `PAGO_RECHAZADO` si el simulador rechaza (token `tok_rechazar`). En ese caso no se guarda nada y la solicitud sigue en TUTOR_SELECCIONADO.
+`pago` es `null` si el servicio no tiene pago registrado. `lugarOEnlace` parte de la zona de encuentro de la solicitud si es presencial.
+
+Errores:
+| Estado | Código | Cuándo |
+|---|---|---|
+| 401 / 403 | — | sin sesión; rol distinto de ESTUDIANTE; no es el dueño de la solicitud; cuenta suspendida |
+| 404 | — | la solicitud no existe |
+| 409 | `SERVICIO_YA_CONFIRMADO` | la solicitud ya estaba FORMALIZADA o dos confirmaciones concurrentes chocaron con el índice único: **no se cobra de nuevo** (idempotencia) |
+| 409 | `SOLICITUD_NO_CONFIRMABLE` | la solicitud no está en TUTOR_SELECCIONADO (publicada, en negociación o cancelada) |
+| 409 | `PROPUESTA_NO_SELECCIONADA` | no hay una propuesta ACEPTADA |
+| 409 | `TUTOR_NO_DISPONIBLE` | la cuenta del tutor dejó de estar activa |
+| 422 | `PAGO_RECHAZADO` | el simulador rechazó el pago; no se guarda nada y se puede reintentar con otro token |
+
+Auditoría (sin el token): `SERVICIO_CONFIRMADO` (entidad `servicio:{id}`; solicitud, tutor, precio, comisión y propuestas descartadas) y `PAGO_RETENIDO` (entidad `pago:{id}`; monto, comisión, neto y referencia). Notificaciones `SERVICIO_CONFIRMADO` al estudiante y al tutor, con enlace `negociacion.html?id={servicioId}`. Un fallo al notificar no revierte la confirmación.
 
 ### Servicios
 | Método y ruta | Rol | Cuerpo | Efecto / respuesta |
 |---|---|---|---|
-| `GET /api/servicios/mios?estado=` | E, T | — | 200 `ServicioDTO[]` (como estudiante o como tutor) |
-| `GET /api/servicios/{id}` | Part., AD | — | 200 `ServicioDTO` |
-| `PATCH /api/servicios/{id}/enlace` | T (del servicio) | `{"lugarOEnlace":"https://meet.example/abc"}` | solo en CONFIRMADO; precio, duración y modalidad son inmutables (409 si se intentan cambiar) |
-| `POST /api/servicios/{id}/iniciar` | Part. | — | CONFIRMADO → EN_DESARROLLO |
-| `POST /api/servicios/{id}/finalizar` | E (del servicio) | — | EN_DESARROLLO → FINALIZADO; liquidación y liberación; 200 `LiquidacionDTO`; 409 "El servicio ya se encuentra finalizado y no requiere nuevas acciones"; 409 si está EN_REVISION |
+| `GET /api/servicios/mios?estado=` | E, T | — | 200 `ServicioDTO[]` (como estudiante o como tutor, recientes primero); `estado` opcional (CONFIRMADO, EN_DESARROLLO, FINALIZADO, EN_REVISION, CANCELADO; otro valor → 400) |
+| `GET /api/servicios/{id}` | Part., AD | — | 200 `ServicioDTO`; 403 para cualquier otro usuario; 404 si no existe |
+| `PATCH /api/servicios/{id}/enlace` | T (del servicio) | `{"lugarOEnlace":"https://meet.example/abc"}` (obligatorio, hasta 300 caracteres) | solo en CONFIRMADO (409 `SERVICIO_NO_EDITABLE` si no); si el cuerpo trae `precioFinalCOP`, `duracion` o `modalidad` → 409 `SERVICIO_INMUTABLE` (inmutables tras la confirmación); 403 si no es el tutor del servicio. Notifica al estudiante y audita `SERVICIO_ENLACE_ACTUALIZADO` |
+| `POST /api/servicios/{id}/iniciar` | Part. | — | CONFIRMADO → EN_DESARROLLO; 409 `TRANSICION_INVALIDA` si no estaba CONFIRMADO; 403 a quien no participa; audita `SERVICIO_INICIADO`. *(El inicio automático por hora llega con la tarea programada del módulo 09.)* |
+| `POST /api/servicios/{id}/finalizar` *(módulo 09)* | E (del servicio) | — | EN_DESARROLLO → FINALIZADO; liquidación y liberación; 200 `LiquidacionDTO`; 409 "El servicio ya se encuentra finalizado y no requiere nuevas acciones"; 409 si está EN_REVISION |
 
 ---
 
@@ -325,9 +342,9 @@ Una sola transacción: verifica TUTOR_SELECCIONADO → copia la comisión vigent
 
 | Método y ruta | Rol | Respuesta |
 |---|---|---|
-| `GET /api/pagos/servicio/{servicioId}` | Part., AD | 200 `LiquidacionDTO` |
-| `GET /api/pagos/mios` | E, T | 200 `LiquidacionDTO[]` (egresos del estudiante o ingresos netos del tutor) |
-| `POST /api/pagos/simular-cierre-automatico?ignorarPlazo=false` | **AD únicamente** | 200 `CierreAutomaticoDTO` |
+| `GET /api/pagos/servicio/{servicioId}` | Part., AD | 200 `LiquidacionDTO` (con el servicio RETENIDO muestra la comisión y el neto que se liquidarán); 403 a otros usuarios; 404 si el servicio o el pago no existen |
+| `GET /api/pagos/mios` | E, T | 200 `LiquidacionDTO[]` (egresos del estudiante o ingresos netos del tutor; recientes primero) |
+| `POST /api/pagos/simular-cierre-automatico?ignorarPlazo=false` *(módulo 09)* | **AD únicamente** | 200 `CierreAutomaticoDTO` |
 
 ### `POST /api/pagos/simular-cierre-automatico` · AD (demo)
 Ejecuta al momento la misma lógica que la tarea programada (`ServicioNegociacion.cerrarAutomaticamente`): busca servicios EN_DESARROLLO cuyo fin programado (`fechaHora + duracion`) más 24 h ya pasó y que no tienen reporte abierto; los finaliza y libera el pago. Con `ignorarPlazo=true` (solo para la demo) omite la espera de 24 h. Queda registrado en la auditoría como `CIERRE_AUTOMATICO_MANUAL`.

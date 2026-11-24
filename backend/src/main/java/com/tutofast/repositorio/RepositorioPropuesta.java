@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.springframework.data.mongodb.repository.MongoRepository;
 
+import com.tutofast.modelo.EstadoPropuesta;
 import com.tutofast.modelo.Propuesta;
 
 public interface RepositorioPropuesta extends MongoRepository<Propuesta, String> {
@@ -20,4 +21,7 @@ public interface RepositorioPropuesta extends MongoRepository<Propuesta, String>
     List<Propuesta> findByTutorIdOrderByFechaCreacionDesc(String tutorId);
 
     List<Propuesta> findBySolicitudIdAndTutorIdOrderByFechaCreacionDesc(String solicitudId, String tutorId);
+
+    /** La propuesta en el estado dado (para la confirmación: la ACEPTADA de la solicitud). */
+    Optional<Propuesta> findFirstBySolicitudIdAndEstado(String solicitudId, EstadoPropuesta estado);
 }

@@ -284,6 +284,7 @@ Guarda las condiciones congeladas al confirmar (R09). Ningún endpoint modifica 
 }
 ```
 - Liquidación (R12): `comisionCOP = round(precio × pct / 100)`, `montoNetoCOP = precio − comisionCOP`. Ejemplo: $40.000 con 10 % → $4.000 / $36.000.
+- Al confirmar (RETENIDO) ya se guardan `comisionCOP` y `montoNetoCOP` calculados con la comisión congelada del servicio (proyección de lo que se liquidará); `liberar` los recalcula con el mismo `comisionPct` y `reembolsar` los pone en 0.
 - `estado`: RETENIDO · LIBERADO · REEMBOLSADO · CONGELADO · RECHAZADO. No se guarda ningún dato de tarjeta: solo la referencia del simulador.
 - Índices: `{servicioId: 1}` único; `{referenciaPasarela: 1}` único *sparse*; `{estado: 1}`.
 

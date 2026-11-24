@@ -15,11 +15,13 @@ const ENLACES_POR_ROL = {
     { texto: 'Inicio', href: 'index.html' },
     { texto: 'Solicitudes', href: 'solicitudes.html' },
     { texto: 'Tutores', href: 'tutores.html' },
+    { texto: 'Servicios', href: 'negociacion.html' },
     { texto: 'Mi perfil', href: 'perfil.html' },
   ],
   TUTOR: [
     { texto: 'Inicio', href: 'index.html' },
     { texto: 'Solicitudes y propuestas', href: 'solicitudes.html' },
+    { texto: 'Servicios', href: 'negociacion.html' },
     { texto: 'Mi perfil', href: 'perfil.html' },
   ],
   ADMINISTRADOR: [

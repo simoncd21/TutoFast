@@ -1,5 +1,6 @@
 package com.tutofast.repositorio;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,4 +17,6 @@ public interface RepositorioPago extends MongoRepository<Pago, String> {
     Optional<Pago> findByReferenciaPasarela(String referenciaPasarela);
 
     List<Pago> findByEstado(EstadoPago estado);
+
+    List<Pago> findByServicioIdIn(Collection<String> servicioIds);
 }

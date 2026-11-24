@@ -7,8 +7,9 @@ import com.tutofast.modelo.Duracion;
 import com.tutofast.modelo.EstadoServicio;
 import com.tutofast.modelo.Modalidad;
 
-public record ServicioDTO(String id, String solicitudId, String propuestaId, String estudianteId, String tutorId,
-                          BigDecimal precioFinalCOP, Duracion duracion, Modalidad modalidad, String lugarOEnlace,
-                          Instant fechaHora, BigDecimal comisionPct, Instant fechaConfirmacion, Instant fechaInicio,
-                          Instant fechaFinalizacion, EstadoServicio estado) {
+/** Servicio acordado, con los participantes por nombre y el estado de su pago ({@code pago} puede ser nulo). */
+public record ServicioDTO(String id, String solicitudId, String propuestaId, String tema, ParticipanteDTO estudiante,
+                          ParticipanteDTO tutor, BigDecimal precioFinalCOP, Duracion duracion, Modalidad modalidad,
+                          String lugarOEnlace, Instant fechaHora, BigDecimal comisionPct, Instant fechaConfirmacion,
+                          Instant fechaInicio, Instant fechaFinalizacion, EstadoServicio estado, PagoResumenDTO pago) {
 }
