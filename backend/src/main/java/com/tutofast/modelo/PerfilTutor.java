@@ -1,5 +1,6 @@
 package com.tutofast.modelo;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,6 +18,22 @@ public class PerfilTutor {
     private int serviciosCompletados;
     private String cuentaBancariaCobro;
     private List<String> asignaturasDominadasIds = new ArrayList<>();
+    /** Reputación (1–5), promedio de las calificaciones visibles recibidas; {@code null} si aún no tiene. */
+    private BigDecimal promedioCalificacion;
+    private List<SoporteVerificacion> soportes = new ArrayList<>();
+
+    public BigDecimal getPromedioCalificacion() { return promedioCalificacion; }
+    public void setPromedioCalificacion(BigDecimal promedioCalificacion) { this.promedioCalificacion = promedioCalificacion; }
+    public List<SoporteVerificacion> getSoportes() { return soportes; }
+    public void setSoportes(List<SoporteVerificacion> soportes) { this.soportes = soportes; }
+
+    public boolean tieneSoportePendiente() {
+        return soportes.stream().anyMatch(s -> s.getEstado() == EstadoSoporte.EN_REVISION);
+    }
+
+    public void registrarServicioCompletado() {
+        serviciosCompletados++;
+    }
 
     public String getPresentacion() { return presentacion; }
     public void setPresentacion(String presentacion) { this.presentacion = presentacion; }

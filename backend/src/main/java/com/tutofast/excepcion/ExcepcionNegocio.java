@@ -19,6 +19,12 @@ public class ExcepcionNegocio extends RuntimeException {
         this("REGLA_NEGOCIO", mensaje, HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
+    /** Transición de estado no permitida: 409 TRANSICION_INVALIDA. */
+    public static ExcepcionNegocio transicionInvalida(String entidad, Object actual, Object destino) {
+        return new ExcepcionNegocio("TRANSICION_INVALIDA",
+                "Transición no permitida en " + entidad + ": " + actual + " → " + destino, HttpStatus.CONFLICT);
+    }
+
     public String getCodigo() {
         return codigo;
     }

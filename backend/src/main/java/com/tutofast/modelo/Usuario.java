@@ -5,11 +5,19 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 /** Usuario de la plataforma (colección {@code usuarios}). El correo se guarda en minúsculas. */
 @Document(collection = "usuarios")
+@CompoundIndexes({
+        @CompoundIndex(name = "ix_tutor_busqueda", def = "{'perfilTutor.nivelVerificacion': 1, 'perfilTutor.promedioCalificacion': -1}"),
+        @CompoundIndex(name = "ix_tutor_asignaturas", def = "{'perfilTutor.asignaturasDominadasIds': 1}"),
+        @CompoundIndex(name = "ix_soportes_estado", def = "{'perfilTutor.soportes.estado': 1}"),
+        @CompoundIndex(name = "ix_est_programa", def = "{'perfilEstudiante.programaId': 1}")
+})
 public class Usuario {
 
     @Id

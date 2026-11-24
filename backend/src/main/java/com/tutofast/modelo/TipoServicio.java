@@ -1,0 +1,5 @@
+package com.tutofast.modelo;
+
+public enum TipoServicio {
+    EXPLICACION_TEMA, RESOLUCION_GUIADA_EJERCICIOS, PREPARACION_EXAMEN, REVISION_TRABAJO
+}

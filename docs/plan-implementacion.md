@@ -52,16 +52,16 @@ Grafo de dependencias:
 
 ## Módulo 02 · `feature/02-modelo-persistencia`
 **Depende de:** 01
-- [ ] `modelo/`: las 22 clases (`@Document` para las raíces; clases simples para los embebidos), `Calificacion` abstracta con `@TypeAlias` en las subclases, enums y `Periodo`.
-- [ ] Métodos de dominio sin E/S: `SolicitudTutoria.validarIntegridad()`, `Pago.calcularLiquidacion()`, `CalificacionAlTutor.calcularPromedio()`, transiciones de estado (`confirmar()`, `iniciarSesion()`, `finalizar()`…) que lanzan `ExcepcionNegocio` si no son válidas.
-- [ ] `repositorio/`: 16 interfaces + `RepositorioSolicitudTutoriaPersonalizado(Impl)` (Criteria dinámicos).
-- [ ] Índices `@Indexed` / `@CompoundIndex`; `config/DatosInicialesSeed` crea los índices parciales (propuesta activa, comisión vigente, mensajes reportados) y el TTL.
-- [ ] `mapper/` base.
+- [x] `modelo/`: las 22 clases (`@Document` para las raíces; clases simples para los embebidos), `Calificacion` abstracta con `@TypeAlias` en las subclases, enums y `Periodo`.
+- [x] Métodos de dominio sin E/S: `SolicitudTutoria.validarIntegridad()`, `Pago.calcularLiquidacion()`, `CalificacionAlTutor.calcularPromedio()`, transiciones de estado (`confirmar()`, `iniciarSesion()`, `finalizar()`…) que lanzan `ExcepcionNegocio` si no son válidas.
+- [x] `repositorio/`: 16 interfaces + `RepositorioSolicitudTutoriaPersonalizado(Impl)` (Criteria dinámicos).
+- [x] Índices `@Indexed` / `@CompoundIndex`; `config/DatosInicialesSeed` crea los índices parciales (propuesta activa, comisión vigente, mensajes reportados) y el TTL.
+- [x] `mapper/` base.
 
 **Pruebas**
-- [ ] `PagoTest`: 40.000 × 10 % → 4.000 / 36.000; redondeo HALF_UP con 12,5 %.
-- [ ] `ServicioTutoriaTest`: transiciones válidas e inválidas.
-- [ ] `CalificacionTest`: promedios.
+- [x] `PagoTest`: 40.000 × 10 % → 4.000 / 36.000; redondeo HALF_UP con 12,5 %.
+- [x] `ServicioTutoriaTest`: transiciones válidas e inválidas.
+- [x] `CalificacionTest`: promedios.
 - [ ] Al arrancar, Atlas muestra las colecciones y los índices.
 
 ## Módulo 03 · `feature/03-seguridad-identidad`

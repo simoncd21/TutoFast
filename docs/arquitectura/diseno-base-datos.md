@@ -4,7 +4,7 @@
 
 ## 1. Convenciones
 - **Identificadores:** el diagrama usa `Integer`; en MongoDB son `ObjectId` y en Java `String id`. Las referencias se llaman `<entidad>Id`.
-- **Dinero (COP):** `BigDecimal` en Java, `Decimal128` en MongoDB (`NumberDecimal`). Los montos se redondean a pesos enteros con `HALF_UP`.
+- **Dinero (COP):** `BigDecimal` en Java, `Decimal128` en MongoDB (`NumberDecimal`) mediante los conversores de `config/MongoConfig`. Los montos se redondean a pesos enteros con `HALF_UP`.
 - **Fechas:** `Instant` / `LocalDate` en Java, `ISODate` (UTC) en MongoDB. La interfaz las muestra en `America/Bogota`.
 - **Enums:** se guardan como texto (`"PUBLICADA"`).
 - **Índices:** se declaran con `@Indexed` / `@CompoundIndex` y `spring.data.mongodb.auto-index-creation=true`. Los índices parciales se crean en `DatosInicialesSeed` con `MongoTemplate.indexOps()`.
@@ -157,7 +157,7 @@ Desactivar un elemento del catálogo es un borrado **lógico** (`activa=false`):
   "modificadoPor": { "$oid": "6741a0c1e4b0a1b2c3d4e500" } }
 ```
 - `configurar()`: cierra el registro vigente (`vigenteHasta = ahora`) e inserta uno nuevo. `consultarVigente()`: `{vigenteHasta: null}`.
-- Índices: `{vigenteDesde: -1}`; parcial único `{vigenteHasta: 1}` con `partialFilterExpression: {vigenteHasta: null}`, para que solo exista un parámetro vigente.
+- Índices: `{vigenteDesde: -1}`; parcial único `uk_comision_vigente` sobre `{vigente: 1}` con `partialFilterExpression: {vigente: true}`, para que solo exista un parámetro vigente. (+) `vigente` es un booleano derivado de `vigenteHasta == null`: Spring Data omite los campos nulos, por lo que un filtro parcial sobre `vigenteHasta: null` no los alcanzaría.
 - Los servicios ya confirmados conservan su `comisionPct` (HU-02).
 
 ---
@@ -238,7 +238,7 @@ Se guarda en una colección propia porque varios tutores escriben a la vez sobre
 ```
 - `tipo`: ACEPTA_PRECIO · CONTRAPROPUESTA_PRECIO · ALTERNATIVA_CONDICIONES. `duracion`: MIN_30, MIN_45, MIN_60, MIN_90, MIN_120.
 - `estado`: ENVIADA · CONTRAOFERTA_ESTUDIANTE · ACEPTADA · DESCARTADA · RETIRADA. `activa = estado ∈ {ENVIADA, CONTRAOFERTA_ESTUDIANTE, ACEPTADA}`.
-- Índices: `{solicitudId: 1, estado: 1}`; `{tutorId: 1, fechaCreacion: -1}`; **parcial único** `{solicitudId: 1, tutorId: 1}` con `partialFilterExpression: {activa: true}` (HU-05: una propuesta activa por tutor y solicitud).
+- Índices: `{solicitudId: 1, estado: 1}`; `{tutorId: 1, fechaCreacion: -1}`; **parcial único** `{solicitudId: 1, tutorId: 1}` con `partialFilterExpression: {activa: true}` (HU-05: una propuesta activa por tutor y solicitud).  (+) `contraofertaCOP`: precio propuesto por el estudiante mientras el estado es CONTRAOFERTA_ESTUDIANTE.
 
 ### 5.3 `servicios_tutoria` — ServicioTutoria
 Guarda las condiciones congeladas al confirmar (R09). Ningún endpoint modifica `precioFinalCOP`, `duracion`, `modalidad` ni `comisionPct`.
@@ -314,7 +314,7 @@ Cada hilo de chat se identifica por `(solicitudId, tutorId)` para que los tutore
 ## 6. Reputación
 
 ### 6.1 `calificaciones` — Calificacion (abstracta) / CalificacionAlTutor / CalificacionAlEstudiante
-Herencia en una sola colección. El discriminador `tipo` (`AL_TUTOR` | `AL_ESTUDIANTE`) se mapea con `@TypeAlias`.
+Herencia en una sola colección. Cada subclase lleva `@TypeAlias("AL_TUTOR")` / `@TypeAlias("AL_ESTUDIANTE")` (Spring lo guarda en `_class`) y además el campo explícito `tipo` (`AL_TUTOR` | `AL_ESTUDIANTE`) sobre el que se apoya el índice único `(servicioId, tipo)`.
 
 ```json
 {
