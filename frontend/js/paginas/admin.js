@@ -7,6 +7,7 @@ import {
   listarUniversidades, listarFacultades, listarProgramas, listarAsignaturas, llenarSelect,
 } from '../servicios/catalogo.js';
 import { montarChat } from '../componentes/chat.js';
+import { cargarPanelReportes } from './admin-reportes.js';
 import { exigirSesion } from '../sesion.js';
 
 iniciarEncabezado();
@@ -117,7 +118,7 @@ function pintarTabla(tabla, columnas, filas, vacio) {
 }
 
 // ---------------------------------------------------------------- pestañas
-const PESTANAS = ['catalogos', 'comision', 'verificacion', 'usuarios', 'moderacion', 'cierre', 'auditoria'];
+const PESTANAS = ['catalogos', 'comision', 'verificacion', 'usuarios', 'moderacion', 'reportes', 'cierre', 'auditoria'];
 const cargadas = new Set();
 const cargadores = {
   catalogos: () => cargarUniversidades(),
@@ -125,6 +126,7 @@ const cargadores = {
   verificacion: () => cargarCola(),
   usuarios: () => cargarUsuarios(0),
   moderacion: () => Promise.all([cargarMensajesReportados(), cargarResenasReportadas()]),
+  reportes: () => cargarPanelReportes(),
   cierre: () => {},
   auditoria: () => cargarAuditoria(0),
 };
@@ -771,8 +773,9 @@ formCierre.addEventListener('submit', async (e) => {
     adminId = usuario.id;
     document.getElementById('cargando').hidden = true;
     document.getElementById('contenido').hidden = false;
-    // Los enlaces de las notificaciones de reporte abren directamente la moderación.
-    activarPestana(['#mensajes', '#resenas'].includes(window.location.hash) ? 'moderacion' : 'catalogos');
+    // Los enlaces de las notificaciones abren directamente la moderación o los reportes y apelaciones.
+    const hash = window.location.hash;
+    activarPestana(['#mensajes', '#resenas'].includes(hash) ? 'moderacion' : hash === '#reportes' ? 'reportes' : 'catalogos');
   } catch (err) {
     document.getElementById('cargando').hidden = true;
     mostrarAviso(err.message ?? 'No se pudo cargar el panel. Inténtalo de nuevo.', 'error');

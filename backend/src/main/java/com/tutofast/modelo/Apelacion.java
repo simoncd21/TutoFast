@@ -18,6 +18,8 @@ public class Apelacion {
     private ResultadoApelacion resultado = ResultadoApelacion.PENDIENTE;
     private Instant fechaPresentacion;
     private Instant fechaResolucion;
+    private String observacionResolucion;
+    private String resueltaPor;
 
     public Apelacion() {
     }
@@ -44,6 +46,13 @@ public class Apelacion {
         this.fechaResolucion = ahora;
     }
 
+    /** Igual que {@link #resolver(ResultadoApelacion, Instant)} dejando constancia de quién y por qué. */
+    public void resolver(ResultadoApelacion nuevo, Instant ahora, String observacion, String administradorId) {
+        resolver(nuevo, ahora);
+        this.observacionResolucion = observacion;
+        this.resueltaPor = administradorId;
+    }
+
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
     public String getDescargo() { return descargo; }
@@ -55,5 +64,9 @@ public class Apelacion {
     public Instant getFechaPresentacion() { return fechaPresentacion; }
     public void setFechaPresentacion(Instant fechaPresentacion) { this.fechaPresentacion = fechaPresentacion; }
     public Instant getFechaResolucion() { return fechaResolucion; }
+    public String getObservacionResolucion() { return observacionResolucion; }
+    public void setObservacionResolucion(String observacionResolucion) { this.observacionResolucion = observacionResolucion; }
+    public String getResueltaPor() { return resueltaPor; }
+    public void setResueltaPor(String resueltaPor) { this.resueltaPor = resueltaPor; }
     public void setFechaResolucion(Instant fechaResolucion) { this.fechaResolucion = fechaResolucion; }
 }

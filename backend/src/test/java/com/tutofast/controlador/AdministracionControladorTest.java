@@ -74,7 +74,8 @@ class AdministracionControladorTest {
                 .standaloneSetup(new CatalogoControlador(catalogo), new ComisionControlador(catalogo),
                         new AdministracionControlador(identidad, auditoria,
                                 mock(com.tutofast.servicio.ServicioMensajeria.class),
-                                mock(com.tutofast.servicio.ServicioReputacion.class)))
+                                mock(com.tutofast.servicio.ServicioReputacion.class),
+                                mock(com.tutofast.servicio.ServicioReportes.class)))
                 .setControllerAdvice(new ManejadorGlobalExcepciones())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(mapper))
                 .setCustomArgumentResolvers(new ResolvedorUsuarioAutenticado())

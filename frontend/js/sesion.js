@@ -50,6 +50,12 @@ function fijarRolPorDefecto(usuario) {
   else localStorage.removeItem(CLAVE_ROL);
 }
 
+/** Cuenta suspendida o bloqueada: solo puede consultar su perfil y apelar sus sanciones. */
+export function cuentaRestringida() {
+  const estado = obtenerUsuario()?.estadoCuenta;
+  return Boolean(estado) && estado !== 'ACTIVA';
+}
+
 export function rolesDisponibles() {
   return obtenerUsuario()?.roles ?? [];
 }
@@ -113,6 +119,11 @@ export async function exigirSesion(rolesPermitidos = null) {
   }
   try {
     const usuario = await refrescarUsuario();
+    // Una cuenta suspendida o bloqueada solo puede usar el perfil (sanciones y apelaciones).
+    if (cuentaRestringida() && (window.location.pathname.split('/').pop() || 'index.html') !== 'perfil.html') {
+      window.location.replace('perfil.html#sanciones');
+      return null;
+    }
     if (rolesPermitidos && !usuario.roles.some((r) => rolesPermitidos.includes(r))) {
       window.location.replace('perfil.html');
       return null;

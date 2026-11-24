@@ -57,6 +57,7 @@ import com.tutofast.servicio.ServicioNegociacion;
 import com.tutofast.servicio.ServicioNotificaciones;
 import com.tutofast.servicio.ServicioPagos;
 import com.tutofast.servicio.ServicioPropuestas;
+import com.tutofast.servicio.ServicioReportes;
 import com.tutofast.servicio.ServicioReputacion;
 
 /**
@@ -102,6 +103,7 @@ public class EscenarioNegociacion {
     public final ServicioNegociacion servicioNegociacion;
     public final ServicioMensajeria servicioMensajeria;
     public final ServicioReputacion servicioReputacion;
+    public final ServicioReportes servicioReportes;
     public final AplicadorSanciones aplicadorSanciones;
     public final ServicioArchivos servicioArchivos;
     public final ServicioAuditoria auditoria;
@@ -132,6 +134,9 @@ public class EscenarioNegociacion {
                 repoUsuarios, servicioArchivos, auditoria, notificaciones, aplicadorSanciones);
         servicioReputacion = new ServicioReputacion(repoCalificaciones, repoServicios, repoUsuarios, auditoria,
                 notificaciones, aplicadorSanciones);
+        servicioReportes = new ServicioReportes(repoReportes, repoSanciones, repoServicios, repoSolicitudes, repoMensajes,
+                repoUsuarios, servicioPagos, servicioArchivos, auditoria, notificaciones, aplicadorSanciones,
+                servicioReputacion, new GestorTransaccionesNoOp());
         servicioNegociacion = new ServicioNegociacion(repoSolicitudes, repoPropuestas, repoServicios, repoUsuarios,
                 servicioPropuestas, servicioPagos, catalogo, auditoria, notificaciones, servicioMensajeria,
                 servicioReputacion, repoReportes, new GestorTransaccionesNoOp());
@@ -267,6 +272,9 @@ public class EscenarioNegociacion {
         when(repoMensajes.countBySolicitudIdAndTutorIdAndEmisorIdNotAndLeidoFalse(anyString(), anyString(), anyString()))
                 .thenAnswer(inv -> hilo(inv.getArgument(0), inv.getArgument(1)).stream()
                         .filter(m -> !m.isLeido() && !inv.getArgument(2).equals(m.getEmisorId())).count());
+        when(repoMensajes.findBySolicitudIdAndTutorIdOrderByMarcaTemporalAsc(anyString(), anyString())).thenAnswer(inv ->
+                hilo(inv.getArgument(0), inv.getArgument(1)).stream()
+                        .sorted(Comparator.comparing(Mensaje::getMarcaTemporal)).toList());
         when(repoMensajes.findByArchivoGridFsId(anyString())).thenAnswer(inv -> mensajes.values().stream()
                 .filter(m -> m.getArchivo() != null && inv.getArgument(0).equals(m.getArchivo().getGridFsId())).findFirst());
         when(repoMensajes.findByReportadoTrueOrderByMarcaTemporalDesc()).thenAnswer(inv -> mensajes.values().stream()
@@ -346,8 +354,54 @@ public class EscenarioNegociacion {
             reportes.remove(inv.<String>getArgument(0));
             return null;
         }).when(repoReportes).deleteById(anyString());
+        when(repoSanciones.findById(anyString())).thenAnswer(inv -> Optional.ofNullable(sanciones.get(inv.<String>getArgument(0))));
+        when(repoSanciones.findByUsuarioIdOrderByIdDesc(anyString())).thenAnswer(inv -> sanciones.values().stream()
+                .filter(s -> s.getUsuarioId().equals(inv.getArgument(0)))
+                .sorted(Comparator.comparing(Sancion::getId).reversed()).toList());
+        when(repoSanciones.findByReporteId(anyString())).thenAnswer(inv -> sanciones.values().stream()
+                .filter(s -> inv.getArgument(0).equals(s.getReporteId())).toList());
+        when(repoSanciones.findByEstado(any(EstadoSancion.class), any(Pageable.class))).thenAnswer(inv -> {
+            List<Sancion> lista = sanciones.values().stream().filter(s -> s.getEstado() == inv.<EstadoSancion>getArgument(0))
+                    .sorted(Comparator.comparing(Sancion::getId).reversed()).toList();
+            return new org.springframework.data.domain.PageImpl<>(lista, inv.<Pageable>getArgument(1), lista.size());
+        });
+        when(repoSanciones.findAll(any(Pageable.class))).thenAnswer(inv -> {
+            List<Sancion> lista = sanciones.values().stream().sorted(Comparator.comparing(Sancion::getId).reversed()).toList();
+            return new org.springframework.data.domain.PageImpl<>(lista, inv.<Pageable>getArgument(0), lista.size());
+        });
+        when(repoSanciones.buscarPorEvidenciaDeApelacion(anyString())).thenAnswer(inv -> sanciones.values().stream()
+                .filter(s -> s.getApelaciones().stream().anyMatch(a -> a.getEvidencias().contains(inv.<String>getArgument(0))))
+                .toList());
+        when(repoReportes.findById(anyString())).thenAnswer(inv -> Optional.ofNullable(reportes.get(inv.<String>getArgument(0))));
+        when(repoReportes.findByEstado(any(com.tutofast.modelo.EstadoReporte.class), any(Pageable.class))).thenAnswer(inv -> {
+            List<Reporte> lista = reportes.values().stream().filter(r -> r.getEstado() == inv.<com.tutofast.modelo.EstadoReporte>getArgument(0))
+                    .sorted(Comparator.comparing(Reporte::getFechaRadicacion).reversed()).toList();
+            return new org.springframework.data.domain.PageImpl<>(lista, inv.<Pageable>getArgument(1), lista.size());
+        });
+        when(repoReportes.findAll(any(Pageable.class))).thenAnswer(inv -> {
+            List<Reporte> lista = reportes.values().stream()
+                    .sorted(Comparator.comparing(Reporte::getFechaRadicacion).reversed()).toList();
+            return new org.springframework.data.domain.PageImpl<>(lista, inv.<Pageable>getArgument(0), lista.size());
+        });
+        when(repoReportes.findByReportanteIdOrderByFechaRadicacionDesc(anyString())).thenAnswer(inv -> reportes.values().stream()
+                .filter(r -> r.getReportanteId().equals(inv.getArgument(0)))
+                .sorted(Comparator.comparing(Reporte::getFechaRadicacion).reversed()).toList());
+        when(repoReportes.findByDenunciadoIdOrderByFechaRadicacionDesc(anyString())).thenAnswer(inv -> reportes.values().stream()
+                .filter(r -> r.getDenunciadoId().equals(inv.getArgument(0)))
+                .sorted(Comparator.comparing(Reporte::getFechaRadicacion).reversed()).toList());
+        when(repoReportes.findByServicioId(anyString())).thenAnswer(inv -> reportes.values().stream()
+                .filter(r -> inv.getArgument(0).equals(r.getServicioId())).toList());
+        when(repoReportes.buscarPorEvidencia(anyString())).thenAnswer(inv -> reportes.values().stream()
+                .filter(r -> r.getEvidencias().contains(inv.<String>getArgument(0))).toList());
+        when(repoReportes.existsByReportanteIdAndDenunciadoIdAndServicioIdAndEstadoIn(any(), any(), any(), anyCollection()))
+                .thenAnswer(inv -> reportes.values().stream().anyMatch(r -> r.getReportanteId().equals(inv.getArgument(0))
+                        && r.getDenunciadoId().equals(inv.getArgument(1))
+                        && java.util.Objects.equals(r.getServicioId(), inv.getArgument(2))
+                        && inv.<java.util.Collection<com.tutofast.modelo.EstadoReporte>>getArgument(3).contains(r.getEstado())));
         when(repoReportes.existsByServicioIdAndEstadoIn(anyString(), anyCollection())).thenAnswer(inv ->
-                serviciosConReporteAbierto.contains(inv.<String>getArgument(0)));
+                serviciosConReporteAbierto.contains(inv.<String>getArgument(0))
+                        || reportes.values().stream().anyMatch(r -> inv.getArgument(0).equals(r.getServicioId())
+                        && inv.<java.util.Collection<com.tutofast.modelo.EstadoReporte>>getArgument(1).contains(r.getEstado())));
     }
 
     private void prepararSolicitudes() {

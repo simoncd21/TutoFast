@@ -168,4 +168,42 @@ class PropuestaYSancionTest {
         assertThatThrownBy(() -> m.reportar("otra vez")).isInstanceOf(ExcepcionNegocio.class);
         assertThatThrownBy(() -> Mensaje.nuevo("sol1", "tut1", "est1", " ", null, T0)).isInstanceOf(ExcepcionNegocio.class);
     }
+
+    @Test
+    void resolverUnaApelacionDejaConstanciaDelAdministradorYLaObservacion() {
+        Sancion s = suspension();
+        Apelacion a = s.apelar("Tuve una emergencia médica", List.of("ev1"), T0);
+
+        s.resolverApelacion(a.getId(), ResultadoApelacion.REVOCADA, T0.plusSeconds(60), "Incapacidad válida", "admin1");
+
+        assertThat(a.getObservacionResolucion()).isEqualTo("Incapacidad válida");
+        assertThat(a.getResueltaPor()).isEqualTo("admin1");
+        assertThat(a.getFechaResolucion()).isEqualTo(T0.plusSeconds(60));
+        assertThat(s.getEstado()).isEqualTo(EstadoSancion.REVOCADA);
+    }
+
+    @Test
+    void laResolucionSinDatosDelAdministradorSigueFuncionando() {
+        Sancion s = suspension();
+        Apelacion a = s.apelar("descargo", null, T0);
+
+        s.resolverApelacion(a.getId(), ResultadoApelacion.RATIFICADA, T0);
+
+        assertThat(a.getObservacionResolucion()).isNull();
+        assertThat(a.getResueltaPor()).isNull();
+    }
+
+    @Test
+    void unaApelacionNoPuedeResolverseComoPendienteNiDosVeces() {
+        Sancion s = suspension();
+        Apelacion a = s.apelar("descargo", null, T0);
+
+        assertThatThrownBy(() -> s.resolverApelacion(a.getId(), ResultadoApelacion.PENDIENTE, T0, "x", "admin1"))
+                .isInstanceOf(ExcepcionNegocio.class);
+        assertThat(s.getEstado()).isEqualTo(EstadoSancion.EN_APELACION);
+        s.resolverApelacion(a.getId(), ResultadoApelacion.REVOCADA, T0, "x", "admin1");
+        assertThatThrownBy(() -> a.resolver(ResultadoApelacion.RATIFICADA, T0, "y", "admin2"))
+                .isInstanceOfSatisfying(ExcepcionNegocio.class, e -> assertThat(e.getEstado()).isEqualTo(HttpStatus.CONFLICT));
+        assertThat(a.getResueltaPor()).isEqualTo("admin1");
+    }
 }

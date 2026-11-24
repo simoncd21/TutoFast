@@ -92,7 +92,8 @@ class MensajeriaYCierreControladorTest {
                         new PagoControlador(escenario.servicioPagos, escenario.servicioNegociacion),
                         new PropuestaControlador(escenario.servicioPropuestas),
                         new AdministracionControlador(identidad, escenario.auditoria, escenario.servicioMensajeria,
-                                escenario.servicioReputacion))
+                                escenario.servicioReputacion, escenario.servicioReportes),
+                        new ReporteControlador(escenario.servicioReportes))
                 .setControllerAdvice(new ManejadorGlobalExcepciones())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(mapper))
                 .setCustomArgumentResolvers(new ResolvedorUsuarioAutenticado())

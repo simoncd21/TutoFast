@@ -3,7 +3,7 @@
 import { iniciarTema } from './tema.js';
 import { iniciarNavbar } from './navbar.js';
 import { construirCampana } from './campana.js';
-import { estaAutenticado, obtenerUsuario, rolActivo, rolesDisponibles, cambiarRolActivo, salir, ETIQUETA_ROL } from '../sesion.js';
+import { estaAutenticado, obtenerUsuario, rolActivo, rolesDisponibles, cambiarRolActivo, salir, cuentaRestringida, ETIQUETA_ROL } from '../sesion.js';
 
 // Cada módulo posterior agrega aquí sus páginas por rol.
 const ENLACES_PUBLICOS = [
@@ -16,12 +16,14 @@ const ENLACES_POR_ROL = {
     { texto: 'Solicitudes', href: 'solicitudes.html' },
     { texto: 'Tutores', href: 'tutores.html' },
     { texto: 'Servicios', href: 'negociacion.html' },
+    { texto: 'Reportes', href: 'reportes.html' },
     { texto: 'Mi perfil', href: 'perfil.html' },
   ],
   TUTOR: [
     { texto: 'Inicio', href: 'index.html' },
     { texto: 'Solicitudes y propuestas', href: 'solicitudes.html' },
     { texto: 'Servicios', href: 'negociacion.html' },
+    { texto: 'Reportes', href: 'reportes.html' },
     { texto: 'Mi perfil', href: 'perfil.html' },
   ],
   ADMINISTRADOR: [
@@ -32,6 +34,12 @@ const ENLACES_POR_ROL = {
     { texto: 'Mi perfil', href: 'perfil.html' },
   ],
 };
+
+// Una cuenta suspendida o bloqueada solo alcanza su perfil (sanciones y apelaciones).
+const ENLACES_CUENTA_RESTRINGIDA = [
+  { texto: 'Inicio', href: 'index.html' },
+  { texto: 'Mi perfil y sanciones', href: 'perfil.html' },
+];
 
 function elemento(etiqueta, clase, texto) {
   const el = document.createElement(etiqueta);
@@ -60,7 +68,9 @@ function construirNavegacion(autenticado) {
   const nav = elemento('nav', 'navbar__enlaces');
   nav.setAttribute('data-menu-enlaces', '');
   nav.setAttribute('aria-label', 'Principal');
-  const enlaces = autenticado ? (ENLACES_POR_ROL[rolActivo()] ?? []) : ENLACES_PUBLICOS;
+  const enlaces = !autenticado ? ENLACES_PUBLICOS
+    : cuentaRestringida() ? ENLACES_CUENTA_RESTRINGIDA
+      : (ENLACES_POR_ROL[rolActivo()] ?? []);
   enlaces.forEach((e) => nav.appendChild(enlace(e.texto, e.href)));
   return nav;
 }

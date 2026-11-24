@@ -97,6 +97,15 @@ public class ServicioPagos {
         return pago;
     }
 
+    /** Devuelve a RETENIDO un pago CONGELADO cuando el reporte no prosperó o se compensa un fallo (409 en otro estado). */
+    public Pago descongelarPago(String servicioId, String actorId, Instant ahora) {
+        Pago pago = exigirPago(servicioId);
+        pago.descongelar(ahora);
+        pago = pagos.save(pago);
+        auditoria.registrarAccion(actorId, "PAGO_DESCONGELADO", "pago:" + pago.getId(), mapa("servicioId", servicioId));
+        return pago;
+    }
+
     /** Devuelve al estudiante el monto completo, sin comisión, de un pago CONGELADO (409 en otro estado). */
     public Pago reembolsarPago(String servicioId, String actorId, Instant ahora) {
         Pago pago = exigirPago(servicioId);

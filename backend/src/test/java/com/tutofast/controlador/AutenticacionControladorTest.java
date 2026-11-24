@@ -243,8 +243,35 @@ class AutenticacionControladorTest {
         String token = registrarYLoguear(REGISTRO_ESTUDIANTE, "estudiante@universidad.edu.co");
         almacen.values().forEach(u -> u.setEstadoCuenta(EstadoCuenta.SUSPENDIDA));
 
-        mvc.perform(get("/api/auth/yo").header("Authorization", "Bearer " + token))
+        // Con la cuenta suspendida el token deja de servir para la plataforma (403)...
+        mvc.perform(get("/api/usuarios/yo").header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.codigo").value("NO_AUTORIZADO"));
+        json("POST", "/api/usuarios/yo/roles", "{\"rol\":\"TUTOR\"}", token).andExpect(status().isForbidden());
+        // ...salvo para ver su propio estado y, en el módulo de sanciones, consultar y apelar (sesión restringida).
+        mvc.perform(get("/api/auth/yo").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estadoCuenta").value("SUSPENDIDA"));
+    }
+
+    @Test
+    void cuentaSuspendidaOBloqueadaPuedeIniciarSesionPeroSoloConAccesoRestringido() throws Exception {
+        registrarYLoguear(REGISTRO_ESTUDIANTE, "estudiante@universidad.edu.co");
+        almacen.values().forEach(u -> u.setEstadoCuenta(EstadoCuenta.BLOQUEADA));
+
+        String respuesta = json("POST", "/api/auth/iniciar-sesion",
+                "{\"correo\":\"estudiante@universidad.edu.co\",\"clave\":\"Segura#2026\"}", null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.usuario.estadoCuenta").value("BLOQUEADA"))
+                .andReturn().getResponse().getContentAsString();
+        String token = mapper.readTree(respuesta).get("token").asText();
+
+        mvc.perform(get("/api/auth/yo").header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+        mvc.perform(get("/api/usuarios/yo/soportes").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+        // Un administrador reactiva la cuenta y el acceso vuelve a ser completo.
+        almacen.values().forEach(u -> u.setEstadoCuenta(EstadoCuenta.ACTIVA));
+        mvc.perform(get("/api/usuarios/yo").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
     }
 }

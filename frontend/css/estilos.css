@@ -528,3 +528,15 @@ ul.fila-badges { margin: var(--espacio-2) 0 0; padding: 0; }
 .moderacion__form { display: grid; gap: var(--espacio-2); padding: var(--espacio-3); border: 1px dashed var(--borde); border-radius: var(--radio-md); background: var(--superficie); }
 .cierre-resultado { display: grid; gap: var(--espacio-2); margin-top: var(--espacio-4); }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* ---- Reportes, sanciones y apelaciones (módulo 10) ---- */
+.moderacion__item h4 { margin: var(--espacio-3) 0 var(--espacio-1); font-size: 1rem; }
+.expediente { display: grid; gap: var(--espacio-2); padding: var(--espacio-3); border: 1px solid var(--borde); border-radius: var(--radio-md); background: var(--superficie); }
+.expediente[hidden] { display: none; }
+.expediente__chat { max-height: 320px; overflow-y: auto; display: grid; gap: var(--espacio-2); padding: var(--espacio-2); border: 1px solid var(--borde); border-radius: var(--radio-md); background: var(--superficie-2); }
+.expediente__mensaje { padding: var(--espacio-2) var(--espacio-3); border-left: 3px solid var(--color-primario); background: var(--superficie); border-radius: var(--radio-sm); }
+.expediente__mensaje--retirado { border-left-color: var(--error); }
+.expediente__mensaje p { margin: var(--espacio-1) 0 0; white-space: pre-wrap; word-break: break-word; }
+.sancion__apelacion { display: grid; gap: var(--espacio-2); padding: var(--espacio-3); border: 1px solid var(--borde); border-radius: var(--radio-md); background: var(--superficie); color: var(--texto); }
+.sancion__apelacion p { margin: 0; }
+.sancion__apelacion .moderacion__cita { border-left-color: var(--info); }

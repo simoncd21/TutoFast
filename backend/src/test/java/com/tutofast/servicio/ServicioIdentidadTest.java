@@ -165,18 +165,24 @@ class ServicioIdentidadTest {
     }
 
     @Test
-    void impideAccesoACuentasSuspendidasOBloqueadas() {
+    void cuentasSuspendidasOBloqueadasSoloObtienenSesionRestringida() {
         var id = servicio.registrarUsuario(registro("a@b.co", "1111111111", Rol.ESTUDIANTE, true)).usuarioId();
         String token = servicio.iniciarSesion(new InicioSesionDTO("a@b.co", "Segura#2026")).token();
+        assertFalse(servicio.autenticarToken(token).restringida());
 
         almacen.get(id).setEstadoCuenta(EstadoCuenta.SUSPENDIDA);
 
-        assertThrows(ExcepcionAutorizacion.class,
-                () -> servicio.iniciarSesion(new InicioSesionDTO("a@b.co", "Segura#2026")));
-        assertThrows(ExcepcionAutorizacion.class, () -> servicio.autenticarToken(token));
+        // Pueden iniciar sesión (para apelar), pero la sesión queda marcada como restringida.
+        var sesion = servicio.iniciarSesion(new InicioSesionDTO("a@b.co", "Segura#2026"));
+        assertEquals(EstadoCuenta.SUSPENDIDA, sesion.usuario().estadoCuenta());
+        assertTrue(servicio.autenticarToken(sesion.token()).restringida());
+        assertTrue(servicio.autenticarToken(token).restringida());
 
         almacen.get(id).setEstadoCuenta(EstadoCuenta.BLOQUEADA);
-        assertThrows(ExcepcionAutorizacion.class, () -> servicio.autenticarToken(token));
+        assertTrue(servicio.autenticarToken(token).restringida());
+
+        almacen.get(id).setEstadoCuenta(EstadoCuenta.ACTIVA);
+        assertFalse(servicio.autenticarToken(token).restringida());
     }
 
     @Test
@@ -528,11 +534,13 @@ class ServicioIdentidadTest {
         assertEquals(EstadoCuenta.SUSPENDIDA, suspendida.estadoCuenta());
         assertEquals(EstadoCuenta.SUSPENDIDA, almacen.get(id).getEstadoCuenta());
         assertTrue(acciones().contains("CAMBIAR_ESTADO_CUENTA"));
-        assertThrows(ExcepcionAutorizacion.class, () -> servicio.iniciarSesion(
-                new InicioSesionDTO("tutor@gmail.com", "Segura#2026")));
+        // La cuenta suspendida solo obtiene una sesión restringida (para consultar y apelar sanciones).
+        String tokenSuspendido = servicio.iniciarSesion(new InicioSesionDTO("tutor@gmail.com", "Segura#2026")).token();
+        assertTrue(servicio.autenticarToken(tokenSuspendido).restringida());
 
         servicio.cambiarEstadoCuenta(admin, id, EstadoCuenta.ACTIVA, null);
         assertEquals(EstadoCuenta.ACTIVA, almacen.get(id).getEstadoCuenta());
+        assertFalse(servicio.autenticarToken(tokenSuspendido).restringida());
     }
 
     @Test

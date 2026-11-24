@@ -63,12 +63,18 @@ public class Sancion {
 
     /** EN_APELACION → RATIFICADA | REVOCADA según el resultado de la apelación. */
     public void resolverApelacion(String apelacionId, ResultadoApelacion resultado, Instant ahora) {
+        resolverApelacion(apelacionId, resultado, ahora, null, null);
+    }
+
+    /** Igual que la anterior, dejando constancia del administrador y su observación en la apelación. */
+    public void resolverApelacion(String apelacionId, ResultadoApelacion resultado, Instant ahora,
+                                  String observacion, String administradorId) {
         if (estado != EstadoSancion.EN_APELACION) {
             throw ExcepcionNegocio.transicionInvalida("la sanción", estado, "resuelta");
         }
         Apelacion apelacion = apelaciones.stream().filter(a -> a.getId().equals(apelacionId)).findFirst()
                 .orElseThrow(() -> new ExcepcionNegocio("APELACION_INEXISTENTE", "La apelación no existe", HttpStatus.NOT_FOUND));
-        apelacion.resolver(resultado, ahora);
+        apelacion.resolver(resultado, ahora, observacion, administradorId);
         estado = resultado == ResultadoApelacion.REVOCADA ? EstadoSancion.REVOCADA : EstadoSancion.RATIFICADA;
     }
 

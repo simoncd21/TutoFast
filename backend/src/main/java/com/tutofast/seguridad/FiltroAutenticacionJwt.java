@@ -23,8 +23,12 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Filtro HTTP liviano y sin estado: lee {@code Authorization: Bearer <token>}, resuelve el usuario
- * (verificando que su cuenta siga activa) y lo deja como atributo de la petición. Las rutas
- * públicas y las que no empiezan por /api pasan sin token.
+ * y lo deja como atributo de la petición. Las rutas públicas y las que no empiezan por /api pasan sin token.
+ *
+ * <p>Una cuenta SUSPENDIDA o BLOQUEADA tiene sesión restringida: solo alcanza su propio estado ({@code /api/auth/yo}),
+ * sus sanciones y apelaciones ({@code /api/sanciones}), sus notificaciones y la descarga de archivos (las evidencias
+ * de su apelación). Cualquier otra ruta responde 403, de modo que el sancionado pueda ejercer su derecho de apelación
+ * sin recuperar el acceso a la plataforma.
  */
 @Component
 public class FiltroAutenticacionJwt extends OncePerRequestFilter {
@@ -64,6 +68,11 @@ public class FiltroAutenticacionJwt extends OncePerRequestFilter {
         try {
             UsuarioAutenticado usuario = servicioIdentidad.autenticarToken(
                     cabecera.substring(PREFIJO_BEARER.length()).trim());
+            if (usuario.restringida() && !rutaPermitidaConSesionRestringida(request)) {
+                escribirError(response, HttpStatus.FORBIDDEN, "NO_AUTORIZADO",
+                        "Su cuenta está suspendida o bloqueada: solo puede consultar y apelar sus sanciones");
+                return;
+            }
             request.setAttribute(ATRIBUTO_USUARIO, usuario);
         } catch (ExcepcionNoAutenticado e) {
             escribirError(response, HttpStatus.UNAUTHORIZED, "NO_AUTENTICADO", e.getMessage());
@@ -73,6 +82,16 @@ public class FiltroAutenticacionJwt extends OncePerRequestFilter {
             return;
         }
         cadena.doFilter(request, response);
+    }
+
+    /** Rutas que una cuenta suspendida o bloqueada sí puede usar (solo lectura, salvo apelar y marcar avisos). */
+    private boolean rutaPermitidaConSesionRestringida(HttpServletRequest request) {
+        String ruta = rutaNormalizada(request);
+        boolean lectura = HttpMethod.GET.matches(request.getMethod());
+        return (lectura && ruta.equals("/api/auth/yo"))
+                || ruta.equals("/api/sanciones") || ruta.startsWith("/api/sanciones/")
+                || (lectura && ruta.startsWith("/api/archivos/"))
+                || ruta.startsWith("/api/notificaciones");
     }
 
     /** El catálogo académico se consulta sin sesión (lo necesita el formulario de registro); solo lecturas. */

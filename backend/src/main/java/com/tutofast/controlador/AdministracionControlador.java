@@ -14,17 +14,24 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.tutofast.dto.CambioEstadoCuentaDTO;
+import com.tutofast.dto.ExpedienteReporteDTO;
 import com.tutofast.dto.MensajeReportadoDTO;
 import com.tutofast.dto.ModeracionEntradaDTO;
 import com.tutofast.dto.Pagina;
 import com.tutofast.dto.RechazoSoporteDTO;
+import com.tutofast.dto.ReporteDTO;
+import com.tutofast.dto.ResolucionApelacionEntradaDTO;
+import com.tutofast.dto.ResolucionEntradaDTO;
 import com.tutofast.dto.RegistroAuditoriaDTO;
 import com.tutofast.dto.ResenaReportadaDTO;
 import com.tutofast.dto.RevisionSoporteDTO;
+import com.tutofast.dto.SancionDTO;
 import com.tutofast.dto.SoporteColaDTO;
 import com.tutofast.dto.SoporteDTO;
 import com.tutofast.dto.UsuarioAdminDTO;
 import com.tutofast.modelo.EstadoCuenta;
+import com.tutofast.modelo.EstadoReporte;
+import com.tutofast.modelo.EstadoSancion;
 import com.tutofast.modelo.EstadoSoporte;
 import com.tutofast.modelo.Rol;
 import com.tutofast.seguridad.RolesPermitidos;
@@ -32,11 +39,12 @@ import com.tutofast.seguridad.UsuarioAutenticado;
 import com.tutofast.servicio.ServicioAuditoria;
 import com.tutofast.servicio.ServicioIdentidad;
 import com.tutofast.servicio.ServicioMensajeria;
+import com.tutofast.servicio.ServicioReportes;
 import com.tutofast.servicio.ServicioReputacion;
 
 import jakarta.validation.Valid;
 
-/** Panel de administración: verificación de tutores, usuarios y auditoría (todo ADMINISTRADOR). */
+/** Panel de administración: verificación, moderación, reportes, sanciones, usuarios y auditoría (todo ADMINISTRADOR). */
 @RestController
 @RequestMapping("/api/admin")
 @RolesPermitidos(Rol.ADMINISTRADOR)
@@ -46,13 +54,50 @@ public class AdministracionControlador {
     private final ServicioAuditoria auditoria;
     private final ServicioMensajeria mensajeria;
     private final ServicioReputacion reputacion;
+    private final ServicioReportes reportes;
 
     public AdministracionControlador(ServicioIdentidad identidad, ServicioAuditoria auditoria,
-                                     ServicioMensajeria mensajeria, ServicioReputacion reputacion) {
+                                     ServicioMensajeria mensajeria, ServicioReputacion reputacion,
+                                     ServicioReportes reportes) {
         this.identidad = identidad;
         this.auditoria = auditoria;
         this.mensajeria = mensajeria;
         this.reputacion = reputacion;
+        this.reportes = reportes;
+    }
+
+    // ---- Reportes, sanciones y apelaciones ----
+
+    @GetMapping("/reportes")
+    public Pagina<ReporteDTO> reportes(@RequestParam(required = false) EstadoReporte estado,
+                                       @RequestParam(defaultValue = "0") int pagina,
+                                       @RequestParam(defaultValue = "20") int tamano) {
+        return reportes.listarReportes(estado, pagina, tamano);
+    }
+
+    @GetMapping("/reportes/{id}")
+    public ExpedienteReporteDTO expediente(@PathVariable String id) {
+        return reportes.consultarExpediente(id);
+    }
+
+    @PostMapping("/reportes/{id}/resolver")
+    public ReporteDTO resolverReporte(UsuarioAutenticado admin, @PathVariable String id,
+                                      @Valid @RequestBody ResolucionEntradaDTO dto) {
+        return reportes.resolverReporte(admin.id(), id, dto);
+    }
+
+    @GetMapping("/sanciones")
+    public Pagina<SancionDTO> sanciones(@RequestParam(required = false) EstadoSancion estado,
+                                        @RequestParam(defaultValue = "0") int pagina,
+                                        @RequestParam(defaultValue = "20") int tamano) {
+        return reportes.listarSanciones(estado, pagina, tamano);
+    }
+
+    @PostMapping("/sanciones/{id}/apelaciones/{apelacionId}/resolver")
+    public SancionDTO resolverApelacion(UsuarioAutenticado admin, @PathVariable String id,
+                                        @PathVariable String apelacionId,
+                                        @Valid @RequestBody ResolucionApelacionEntradaDTO dto) {
+        return reportes.resolverApelacion(admin.id(), id, apelacionId, dto);
     }
 
     // ---- Moderación de mensajes y reseñas ----

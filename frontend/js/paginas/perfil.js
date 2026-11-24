@@ -4,7 +4,8 @@ import { exito, error as toastError } from '../componentes/alertas.js';
 import { api, ErrorApi, descargarArchivo } from '../servicios/api.js';
 import { enlazarSelectsAcademicos, listarAsignaturas, consultarAsignatura } from '../servicios/catalogo.js';
 import { crearElementoNotificacion, avisarCambioNotificaciones, EVENTO_NOTIFICACIONES } from '../componentes/campana.js';
-import { exigirSesion, refrescarUsuario, rolActivo, ETIQUETA_ROL } from '../sesion.js';
+import { montarSanciones } from '../componentes/sanciones.js';
+import { exigirSesion, refrescarUsuario, rolActivo, cuentaRestringida, ETIQUETA_ROL } from '../sesion.js';
 
 iniciarEncabezado();
 document.getElementById('anio').textContent = new Date().getFullYear();
@@ -174,6 +175,7 @@ async function guardando(boton, accion) {
 }
 
 function formatearFecha(iso) {
+  if (!iso) return '—';
   const fecha = new Date(iso);
   return Number.isNaN(fecha.getTime())
     ? '—'
@@ -465,12 +467,40 @@ document.getElementById('notif-leer-todas').addEventListener('click', async () =
 // La campana del encabezado también dispara este evento al marcar notificaciones.
 window.addEventListener(EVENTO_NOTIFICACIONES, () => cargarNotificaciones());
 
+// ---- Sanciones y apelaciones ----
+const sanciones = montarSanciones(document.getElementById('lista-sanciones'),
+  document.getElementById('sanciones-vacio'));
+
+/**
+ * Cuenta suspendida o bloqueada: el servidor solo deja consultar el propio estado, las sanciones, las notificaciones y
+ * apelar. Se muestran los datos básicos, el aviso con el estado y las sanciones; el resto del perfil queda oculto.
+ */
+function pintarSesionRestringida(usuario) {
+  pintarDatos({ ...usuario, documento: null, fechaRegistro: null });
+  document.getElementById('seccion-ESTUDIANTE').hidden = true;
+  document.getElementById('seccion-TUTOR').hidden = true;
+  document.getElementById('seccion-soportes').hidden = true;
+  document.getElementById('seccion-roles').hidden = true;
+  const bloqueada = usuario.estadoCuenta === 'BLOQUEADA';
+  document.getElementById('aviso-cuenta-titulo').textContent = bloqueada ? 'Tu cuenta está bloqueada. ' : 'Tu cuenta está suspendida. ';
+  document.getElementById('aviso-cuenta-texto').textContent = 'No puedes usar la plataforma, pero sí consultar tus sanciones '
+    + 'y apelarlas. Si la apelación prospera, tu cuenta se restablecerá.';
+  document.getElementById('aviso-cuenta').hidden = false;
+  document.getElementById('cargando').hidden = true;
+  document.getElementById('contenido').hidden = false;
+}
+
 // ---- Carga inicial ----
 (async function iniciar() {
   try {
     const usuario = await exigirSesion();
     if (!usuario) return;
-    pintar(await api.get('/api/usuarios/yo'));
+    if (cuentaRestringida()) {
+      pintarSesionRestringida(usuario);
+    } else {
+      pintar(await api.get('/api/usuarios/yo'));
+    }
+    sanciones.recargar();
     cargarNotificaciones();
   } catch (err) {
     document.getElementById('cargando').hidden = true;

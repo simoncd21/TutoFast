@@ -1,5 +1,6 @@
 package com.tutofast.servicio;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -261,5 +262,104 @@ class AplicadorSancionesTest {
 
         assertEquals(EstadoCuenta.ACTIVA, carlos.getEstadoCuenta());
         assertEquals(EstadoSancion.CUMPLIDA, buena.getEstado());
+    }
+
+    // ---------------------------------------------------------------- revocación y cierre (módulo 10)
+
+    @Test
+    void restablecerCuentaTrasRevocarUnaSuspensionLaReactiva() {
+        Sancion s = aplicar(laura, suspension(Duration.ofDays(7)));
+        s.setEstado(EstadoSancion.REVOCADA);
+
+        sanciones.restablecerCuenta(s, Instant.now());
+
+        assertEquals(EstadoCuenta.ACTIVA, laura.getEstadoCuenta());
+    }
+
+    @Test
+    void restablecerCuentaConUnBloqueoVigenteLaDejaBloqueada() {
+        Sancion suspension = aplicar(laura, suspension(Duration.ofDays(7)));
+        aplicar(laura, new SancionEntradaDTO(TipoSancion.BLOQUEO_PERMANENTE, null, null));
+        suspension.setEstado(EstadoSancion.REVOCADA);
+
+        sanciones.restablecerCuenta(suspension, Instant.now());
+
+        assertEquals(EstadoCuenta.BLOQUEADA, laura.getEstadoCuenta());
+    }
+
+    @Test
+    void restablecerCuentaDeUnBloqueoConUnaSuspensionVigenteLaDejaSuspendida() {
+        aplicar(laura, suspension(Duration.ofDays(7)));
+        Sancion bloqueo = aplicar(laura, new SancionEntradaDTO(TipoSancion.BLOQUEO_PERMANENTE, null, null));
+        assertEquals(EstadoCuenta.BLOQUEADA, laura.getEstadoCuenta());
+        bloqueo.setEstado(EstadoSancion.REVOCADA);
+
+        sanciones.restablecerCuenta(bloqueo, Instant.now());
+
+        assertEquals(EstadoCuenta.SUSPENDIDA, laura.getEstadoCuenta());
+    }
+
+    @Test
+    void restablecerCuentaNoTocaUnaAdvertenciaNiUnEstadoCambiadoAMano() {
+        Sancion advertencia = aplicar(laura, new SancionEntradaDTO(TipoSancion.ADVERTENCIA, null, null));
+        advertencia.setEstado(EstadoSancion.REVOCADA);
+        laura.setEstadoCuenta(EstadoCuenta.SUSPENDIDA); // suspensión manual, sin sanción que la respalde
+        sanciones.restablecerCuenta(advertencia, Instant.now());
+        assertEquals(EstadoCuenta.SUSPENDIDA, laura.getEstadoCuenta());
+
+        Usuario otro = e.crearUsuario("Otro Tutor", Rol.TUTOR);
+        Sancion suspension = aplicar(otro, suspension(Duration.ofDays(7)));
+        suspension.setEstado(EstadoSancion.REVOCADA);
+        otro.setEstadoCuenta(EstadoCuenta.BLOQUEADA); // bloqueo manual posterior
+        sanciones.restablecerCuenta(suspension, Instant.now());
+        assertEquals(EstadoCuenta.BLOQUEADA, otro.getEstadoCuenta());
+    }
+
+    @Test
+    void siGuardarLaCuentaFallaAlRestablecerElEstadoEnMemoriaNoCambia() {
+        Sancion s = aplicar(laura, suspension(Duration.ofDays(7)));
+        s.setEstado(EstadoSancion.REVOCADA);
+        when(e.repoUsuarios.save(any(Usuario.class))).thenThrow(new RuntimeException("Mongo caído"));
+
+        assertThrows(RuntimeException.class, () -> sanciones.restablecerCuenta(s, Instant.now()));
+
+        assertEquals(EstadoCuenta.SUSPENDIDA, laura.getEstadoCuenta());
+    }
+
+    @Test
+    void descartarEliminaLaSancionYRestableceLaCuenta() {
+        Sancion s = aplicar(laura, suspension(Duration.ofDays(7)));
+
+        sanciones.descartar(s, Instant.now());
+
+        assertTrue(e.sanciones.isEmpty());
+        assertEquals(EstadoCuenta.ACTIVA, laura.getEstadoCuenta());
+    }
+
+    @Test
+    void cerrarSiVencidaCumpleUnaSuspensionRatificadaQueYaTermino() {
+        Sancion s = suspensionVencida(laura);
+        s.setEstado(EstadoSancion.RATIFICADA);
+
+        assertTrue(sanciones.cerrarSiVencida(s, Instant.now()));
+
+        assertEquals(EstadoSancion.CUMPLIDA, s.getEstado());
+        assertEquals(EstadoCuenta.ACTIVA, laura.getEstadoCuenta());
+        verify(e.notificaciones).notificar(eq(laura.getId()), eq(TipoNotificacion.SANCION_APLICADA),
+                contains("terminó"), anyString(), anyString());
+    }
+
+    @Test
+    void cerrarSiVencidaNoTocaLasQueSiguenVigentesOSinRatificar() {
+        Sancion vigente = aplicar(laura, suspension(Duration.ofDays(7)));
+        vigente.setEstado(EstadoSancion.RATIFICADA);
+        assertFalse(sanciones.cerrarSiVencida(vigente, Instant.now()));
+        assertEquals(EstadoSancion.RATIFICADA, vigente.getEstado());
+        assertEquals(EstadoCuenta.SUSPENDIDA, laura.getEstadoCuenta());
+
+        Sancion enApelacion = suspensionVencida(carlos);
+        enApelacion.setEstado(EstadoSancion.EN_APELACION);
+        assertFalse(sanciones.cerrarSiVencida(enApelacion, Instant.now()));
+        assertEquals(EstadoSancion.EN_APELACION, enApelacion.getEstado());
     }
 }

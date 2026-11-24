@@ -124,6 +124,13 @@ public class ServicioTutoria {
         estado = EstadoServicio.CANCELADO;
     }
 
+    /** El reporte no prosperó: EN_REVISION → EN_DESARROLLO (si ya había comenzado) o CONFIRMADO. */
+    public void reanudar() {
+        EstadoServicio destino = fechaInicio != null ? EstadoServicio.EN_DESARROLLO : EstadoServicio.CONFIRMADO;
+        exigirEnRevision(destino);
+        estado = destino;
+    }
+
     private void exigirEnRevision(EstadoServicio destino) {
         if (estado != EstadoServicio.EN_REVISION) {
             throw ExcepcionNegocio.transicionInvalida("el servicio", estado, destino);

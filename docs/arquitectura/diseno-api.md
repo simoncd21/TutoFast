@@ -28,7 +28,7 @@
 |---|---|---|
 | 400 | `VALIDACION` | Fallo de `@Valid`; `detalles` = `[{"campo":"descripcion","mensaje":"..."}]` |
 | 401 | `NO_AUTENTICADO` | Token ausente, inválido o expirado |
-| 403 | `NO_AUTORIZADO` | Rol insuficiente, no es dueño/participante, o cuenta suspendida |
+| 403 | `NO_AUTORIZADO` | Rol insuficiente, no es dueño/participante, o cuenta suspendida/bloqueada fuera de `/api/sanciones` (ver sesión restringida, sección 14) |
 | 404 | `NO_ENCONTRADO` | El recurso no existe |
 | 409 | `ESTADO_INVALIDO` / `DUPLICADO` | Transición de estado no permitida, o índice único violado |
 | 413 | `ARCHIVO_DEMASIADO_GRANDE` | Archivo > 10 MB |
@@ -102,7 +102,7 @@ Si MongoDB no responde: 503 con `"estado":"DEGRADADO","baseDatos":"DOWN"`. Rende
   "usuario": { "id": "6741...502", "nombre": "Carlos Gómez", "correo": "estudiante@universidad.edu.co", "roles": ["ESTUDIANTE"], "estadoCuenta": "ACTIVA" }
 }
 ```
-401 con el mensaje genérico "Correo o contraseña incorrectos". 403 si la cuenta está SUSPENDIDA o BLOQUEADA.
+401 con el mensaje genérico "Correo o contraseña incorrectos". Una cuenta SUSPENDIDA o BLOQUEADA inicia sesión con **sesión restringida** (solo ve su estado y sus sanciones; sección 14) y la respuesta lleva `usuario.estadoCuenta`.
 
 ### `GET /api/auth/yo` · A
 200: `UsuarioDTO` (mismo formato que `usuario` en el inicio de sesión).
@@ -110,7 +110,7 @@ Si MongoDB no responde: 503 con `"estado":"DEGRADADO","baseDatos":"DOWN"`. Rende
 ### 3.1 Notas de implementación (módulo de autenticación)
 - El correo se normaliza a minúsculas y se recorta antes de guardarlo y de buscarlo.
 - Validación del registro (400 `VALIDACION`): `documento` de 5 a 15 dígitos; `clave` de 8 a 64 caracteres con letra y número; `semestre` de 1 a 14; `programaId` (opcional) de 24 caracteres hexadecimales.
-- El token JWT (HS256, firmado con `JWT_SECRET`, vigencia `JWT_EXPIRACION_HORAS`, 8 h por defecto) solo lleva el id del usuario. En cada petición protegida `FiltroAutenticacionJwt` recarga al usuario: los roles y el estado de cuenta siempre son los vigentes, y una cuenta SUSPENDIDA o BLOQUEADA recibe 403 aunque su token no haya expirado.
+- El token JWT (HS256, firmado con `JWT_SECRET`, vigencia `JWT_EXPIRACION_HORAS`, 8 h por defecto) solo lleva el id del usuario. En cada petición protegida `FiltroAutenticacionJwt` recarga al usuario: los roles y el estado de cuenta siempre son los vigentes, y una cuenta SUSPENDIDA o BLOQUEADA queda con sesión restringida: 403 en todas las rutas salvo `GET /api/auth/yo` y las de sanciones, notificaciones y descarga de archivos.
 - Rutas públicas: `/api/salud`, `/api/auth/registro` y `/api/auth/iniciar-sesion`. Cualquier otra ruta `/api/**` exige `Authorization: Bearer <token>` (401 `NO_AUTENTICADO` si falta o es inválido). Los roles se exigen con `@RolesPermitidos` (403 `NO_AUTORIZADO`).
 - Administrador inicial: si se definen `ADMIN_CORREO` y `ADMIN_CLAVE` y no existe ningún ADMINISTRADOR, `DatosInicialesSeed` lo crea al arrancar.
 - Prueba manual: `docs/pruebas/modulo-02-autenticacion.ps1`.
@@ -428,26 +428,37 @@ Cuerpo `{"motivo":"..."}` (obligatorio, máx. 500). Solo la persona reseñada, y
 
 ## 14. Reportes, sanciones y apelaciones — `ReporteControlador`
 
+Lógica en `ServicioReportes` (y `AplicadorSanciones`, compartido con la moderación de mensajes y reseñas).
+
 ### `POST /api/reportes` · E, T (multipart)
 - `datos`:
 ```json
 { "tipo": "INASISTENCIA", "motivo": "El tutor no se presentó tras 20 minutos de tolerancia", "denunciadoId": "6741...501", "servicioId": "6741...401" }
 ```
-- `evidencias`: 0 a 5 archivos.
-- Si viene `servicioId` y el servicio está CONFIRMADO o EN_DESARROLLO (o FINALIZADO hace menos de 24 h con el pago aún sin liberar): servicio → EN_REVISION y pago → CONGELADO. Se notifica al denunciado y a los administradores.
-- 201 `ReporteDTO`. 403 si el usuario se reporta a sí mismo o no participa en el servicio.
+- `evidencias`: 0 a 5 archivos (PDF, PNG, JPG o DOCX de hasta 10 MB; se suben a GridFS antes de la transacción y se borran si el guardado falla).
+- Validaciones: `tipo` obligatorio; `motivo` de 10 a 1000 caracteres; más de 5 evidencias → 400. Los tipos `INASISTENCIA`, `COBRO_EXTERNO` y `DESACUERDO_ACADEMICO` exigen `servicioId` (422); los demás pueden ser generales y entonces `denunciadoId` es obligatorio (400).
+- Con `servicioId`: el reportante debe participar en el servicio (403) y el denunciado es siempre la otra parte (si se envía otro → 422; si se omite se deduce).
+- 403 `NO_AUTORIZADO` si se reporta a sí mismo, no participa en el servicio o su cuenta no está activa; 404 si el servicio o el denunciado no existen; 422 si el denunciado es administrador; 409 `REPORTE_DUPLICADO` si ya tiene un reporte abierto igual (mismo denunciado y servicio).
+- El reporte nace `EN_REVISION`. Si el servicio está CONFIRMADO o EN_DESARROLLO (o FINALIZADO hace menos de 24 h con el pago aún retenido) y el pago está RETENIDO: servicio → EN_REVISION (salvo el finalizado, que solo congela el pago) y pago → CONGELADO. En otros casos (servicio cancelado, ya en revisión, pago liquidado) el reporte se registra sin congelar nada. Mientras haya un reporte abierto no se puede finalizar ni cerrar automáticamente el servicio.
+- Se audita `RADICAR_REPORTE` (y `PAGO_CONGELADO`) y se notifica `REPORTE_RECIBIDO` al denunciado y a los administradores. Si algo falla tras congelar se compensa (reporte borrado, pago `PAGO_DESCONGELADO`, servicio reanudado, evidencias eliminadas).
+- 201 `ReporteDTO`.
 
 | Método y ruta | Rol | Respuesta |
 |---|---|---|
-| `GET /api/reportes/mios` | E, T | 200 `{"radicados":[ReporteDTO],"recibidos":[ReporteDTO]}` |
-| `GET /api/sanciones/mias` | A | 200 `SancionDTO[]` |
-| `POST /api/sanciones/{id}/apelaciones` | A (sancionado) | multipart `datos={"descargo":"..."}`, `evidencias[]` → 201 `ApelacionDTO`; sanción → EN_APELACION; 409 si ya hay una apelación pendiente o la sanción no está VIGENTE |
+| `GET /api/reportes/mios` | E, T | 200 `{"radicados":[ReporteDTO],"recibidos":[ReporteDTO]}`; en «recibidos» (vista del denunciado) `reportante` es `null` y `evidencias` va vacía |
+| `GET /api/sanciones/mias` | A (también sesión restringida) | 200 `SancionDTO[]` (todas, más recientes primero) |
+| `POST /api/sanciones/{id}/apelaciones` | A (sancionado; también sesión restringida) | multipart `datos={"descargo":"..."}` (10–2000 caracteres), `evidencias[]` (0–5) → 201 `ApelacionDTO`; sanción → EN_APELACION |
 
-`ReporteDTO`: `{"id","tipo","categoria":"INCUMPLIMIENTO_SERVICIO","motivo","estado","reportante":{id,nombre},"denunciado":{id,nombre},"servicioId","evidencias":[archivoId],"fechaRadicacion","resolucion"}`.
+Errores de la apelación: 403 si la sanción no es del usuario; 404 si no existe; 400 si el descargo no es válido o hay más de 5 evidencias; 409 `APELACION_NO_PERMITIDA` si ya hay una apelación pendiente o la sanción no está VIGENTE (ya apelada y resuelta, revocada o cumplida). Una advertencia también se puede apelar. Se audita `APELACION_PRESENTADA` y se avisa a los administradores. La cuenta sigue suspendida mientras se resuelve.
 
-`SancionDTO`: `{"id","reporteId","tipo","vigencia":{"inicio","fin"},"estado","apelaciones":[{"id","descargo","evidencias","resultado","fechaPresentacion","fechaResolucion"}]}`.
+`ReporteDTO`: `{"id","tipo","categoria":"INCUMPLIMIENTO_SERVICIO","motivo","estado","reportante":{id,nombre},"denunciado":{id,nombre},"servicioId","evidencias":[archivoId],"fechaRadicacion","resolucion":{"decision","accionPago","observacion","resueltoPor":{id,nombre},"fecha"}}`.
 
----
+`SancionDTO`: `{"id","reporteId","usuario":{id,nombre},"tipo","vigencia":{"inicio","fin"},"estado","tipoReporte","motivo","puedeApelar","apelaciones":[ApelacionDTO]}`. `motivo` y `tipoReporte` salen del reporte que la respalda (nunca se revela quién reportó); `puedeApelar` es `true` solo si está VIGENTE.
+
+`ApelacionDTO`: `{"id","descargo","evidencias","resultado","fechaPresentacion","fechaResolucion","observacionResolucion"}`.
+
+### Sesión restringida de las cuentas sancionadas
+Una cuenta SUSPENDIDA o BLOQUEADA **sí puede iniciar sesión** (si no, no podría apelar), pero `FiltroAutenticacionJwt` la limita: solo `GET /api/auth/yo`, `/api/sanciones/**`, `/api/notificaciones/**` y `GET /api/archivos/{id}` (las evidencias de su apelación). Cualquier otra ruta responde 403 `NO_AUTORIZADO` («Su cuenta está suspendida o bloqueada: solo puede consultar y apelar sus sanciones»). El servicio de mensajería y el resto de acciones siguen exigiendo cuenta activa. El frontend redirige a `perfil.html#sanciones`.
 
 ## 15. Notificaciones — `NotificacionControlador`
 
@@ -482,9 +493,10 @@ Cola de verificación ordenada por `prioridad` (ALTA primero) y luego por `fecha
 | `GET /api/admin/usuarios?rol=&estado=&q=` | — | 200 `Pagina<UsuarioAdminDTO>` |
 | `PATCH /api/admin/usuarios/{id}/estado` | `{"estadoCuenta":"SUSPENDIDA","motivo":"..."}` | 200 |
 | `GET /api/admin/reportes?estado=` | — | 200 `Pagina<ReporteDTO>` |
-| `GET /api/admin/reportes/{id}` | — | 200 `{"reporte":ReporteDTO,"servicio":ServicioDTO,"pago":LiquidacionDTO,"historialChat":[MensajeDTO]}` |
+| `GET /api/admin/reportes/{id}` | — | 200 `{"reporte":ReporteDTO,"servicio":ServicioDTO,"pago":LiquidacionDTO,"historialChat":[MensajeDTO],"sanciones":[SancionDTO]}` (servicio, pago y chat son `null`/vacío si el reporte no tiene servicio; el chat es el hilo íntegro del servicio con los mensajes retirados en su versión original) |
 | `POST /api/admin/reportes/{id}/resolver` | `ResolucionDTO` | ver abajo |
-| `POST /api/admin/sanciones/{id}/apelaciones/{apelacionId}/resolver` | `{"resultado":"REVOCADA","observacion":"..."}` | sanción → RATIFICADA o REVOCADA; si se revoca, se restablece `estadoCuenta` |
+| `GET /api/admin/sanciones?estado=&pagina=&tamano=` | — | 200 `Pagina<SancionDTO>` (`EN_APELACION` es la cola de apelaciones) |
+| `POST /api/admin/sanciones/{id}/apelaciones/{apelacionId}/resolver` | `{"resultado":"REVOCADA","observacion":"..."}` | 200 `SancionDTO`; sanción → RATIFICADA o REVOCADA; si se revoca, se restablece `estadoCuenta` |
 | `GET /api/admin/mensajes-reportados` | — | 200 `[{"mensaje":MensajeDTO,"solicitudId","tutorId","motivoReporte"}]` |
 | `GET /api/admin/auditoria?usuarioId=&entidad=&desde=&hasta=` | — | 200 `Pagina<RegistroAuditoriaDTO>` |
 
@@ -493,9 +505,13 @@ Cola de verificación ordenada por `prioridad` (ALTA primero) y luego por `fecha
 { "decision": "A_FAVOR_REPORTANTE", "accionPago": "REEMBOLSAR", "observacion": "Inasistencia comprobada en el chat",
   "sancion": { "tipo": "SUSPENSION_TEMPORAL", "inicio": "2026-12-07T00:00:00Z", "fin": "2026-12-21T00:00:00Z" } }
 ```
-- `decision`: A_FAVOR_REPORTANTE · A_FAVOR_DENUNCIADO · DESESTIMADO. `accionPago`: REEMBOLSAR (servicio CANCELADO) · LIBERAR (servicio FINALIZADO con liquidación) · NINGUNA. `sancion` es opcional.
-- Una SUSPENSION_TEMPORAL pone la cuenta en SUSPENDIDA durante la vigencia; un BLOQUEO_PERMANENTE la pone en BLOQUEADA.
+- `decision` (obligatoria): A_FAVOR_REPORTANTE · A_FAVOR_DENUNCIADO · DESESTIMADO. `observacion` obligatoria (≤ 1000). `accionPago` (por omisión NINGUNA): REEMBOLSAR (pago CONGELADO → REEMBOLSADO sin comisión; servicio → CANCELADO) · LIBERAR (pago RETENIDO/CONGELADO → LIBERADO con la comisión congelada; servicio → FINALIZADO y se recalculan los servicios completados del tutor) · NINGUNA (si no quedan otros reportes abiertos sobre el servicio, el servicio vuelve a CONFIRMADO/EN_DESARROLLO y el pago a RETENIDO).
+- Se valida todo antes de cambiar nada: 400 si falta la decisión o la observación, o si hay `sancion` y la decisión no es A_FAVOR_REPORTANTE; 422 si la acción de pago exige un servicio que el reporte no tiene, si un DESESTIMADO ordena mover dinero, o si la sanción es inválida (suspensión sin `fin` futuro); 409 `PAGO_NO_REEMBOLSABLE` / `PAGO_NO_LIBERABLE` si el pago no está en el estado requerido; 409 `REPORTE_YA_RESUELTO`; 404.
+- La `sancion` (opcional, solo a favor del reportante) recae sobre el denunciado (nunca un administrador). Una SUSPENSION_TEMPORAL pone la cuenta en SUSPENDIDA durante la vigencia (la tarea horaria la reactiva al vencer); un BLOQUEO_PERMANENTE la pone en BLOQUEADA; la ADVERTENCIA no cambia la cuenta.
+- Orden: sanción → reporte → pago y servicio; si un paso falla se compensan los anteriores (sanción descartada y cuenta restablecida, reporte de nuevo EN_REVISION). Audita `RESOLVER_REPORTE`, `SANCION_APLICADA` y los movimientos de pago; notifica `REPORTE_RESUELTO` a reportante y denunciado (y `SANCION_APLICADA`, `PAGO_LIBERADO`, `CALIFICACION_PENDIENTE` según el caso).
 - 200 `ReporteDTO` con `resolucion`.
+
+**Resolver una apelación** (`ResolucionApelacionDTO` = `{"resultado":"REVOCADA|RATIFICADA","observacion":"..."}`, ambos obligatorios): REVOCADA deja la sanción sin efecto y restablece la cuenta al estado que corresponda según las demás sanciones activas (ACTIVA, SUSPENDIDA o BLOQUEADA; una cuenta que un administrador cambió a mano no se toca); RATIFICADA la mantiene (si su vigencia ya terminó mientras se resolvía, pasa a CUMPLIDA y la cuenta se reactiva). 404 si la sanción o la apelación no existen; 409 `APELACION_YA_RESUELTA`; 422 si el resultado es PENDIENTE; 400 si falta la observación. Audita `APELACION_RESUELTA` y notifica `APELACION_RESUELTA` al sancionado. Si falla al restablecer la cuenta se deshace la resolución.
 
 `RegistroAuditoriaDTO`: `{"id","usuarioId","usuarioNombre","accion","entidadAfectada","fecha","detalle"}`.
 ### 16.1 Moderación de mensajes y reseñas (módulo 08/09)
@@ -517,8 +533,8 @@ Cola de verificación ordenada por `prioridad` (ALTA primero) y luego por `fecha
 - `.../aprobar`: cuerpo opcional `{"observacion"}` (≤ 500). `.../rechazar`: `{"observacion"}` obligatoria (400 si falta). Ambos responden 200 con el `SoporteDTO` revisado; un soporte ya revisado → 409 `SOPORTE_YA_REVISADO`; usuario sin rol TUTOR o soporte inexistente → 404.
 - Nivel resultante: `VERIFICADO` si el tutor tiene algún soporte aprobado; si no, `EN_REVISION` mientras le quede alguno pendiente y `NO_VERIFICADO` en otro caso. Notificaciones `SOPORTE_APROBADO` / `SOPORTE_RECHAZADO` (con el motivo) y auditoría `APROBAR_SOPORTE` / `RECHAZAR_SOPORTE`.
 - `GET /api/admin/usuarios?rol=&estado=&q=&pagina=&tamano=`: `Pagina<UsuarioAdminDTO>` con `{"id","nombre","correo","roles","estadoCuenta","fechaRegistro","nivelVerificacion"}` (`q` busca en nombre y correo; más recientes primero; tamaño máximo 100).
-- `PATCH /api/admin/usuarios/{id}/estado`: `motivo` obligatorio para `SUSPENDIDA` y `BLOQUEADA`; no se puede actuar sobre la propia cuenta ni sobre otro administrador (422). Auditoría `CAMBIAR_ESTADO_CUENTA`. Una cuenta no activa deja de poder usar el token en la siguiente petición (403).
-- `GET /api/admin/auditoria`: `desde` y `hasta` son instantes ISO-8601 (`2026-12-01T00:00:00Z`); `usuarioNombre` es «Sistema» cuando `usuarioId` es nulo. Los endpoints de reportes, sanciones y apelaciones de esta tabla llegan en el módulo 10.
+- `PATCH /api/admin/usuarios/{id}/estado`: `motivo` obligatorio para `SUSPENDIDA` y `BLOQUEADA`; no se puede actuar sobre la propia cuenta ni sobre otro administrador (422). Auditoría `CAMBIAR_ESTADO_CUENTA`. Una cuenta no activa pasa a sesión restringida en la siguiente petición (403 fuera de las rutas de sanciones).
+- `GET /api/admin/auditoria`: `desde` y `hasta` son instantes ISO-8601 (`2026-12-01T00:00:00Z`); `usuarioNombre` es «Sistema» cuando `usuarioId` es nulo.
 
 ---
 
@@ -579,8 +595,8 @@ Cola de verificación ordenada por `prioridad` (ALTA primero) y luego por `fecha
 | 58 | GET | /api/servicios/{id}/calificaciones | Part. |
 | 59 | POST | /api/reportes | E, T |
 | 60 | GET | /api/reportes/mios | E, T |
-| 61 | GET | /api/sanciones/mias | A |
-| 62 | POST | /api/sanciones/{id}/apelaciones | A |
+| 61 | GET | /api/sanciones/mias | A (sesión restringida incluida) |
+| 62 | POST | /api/sanciones/{id}/apelaciones | A (sesión restringida incluida) |
 | 63 | GET | /api/notificaciones | A |
 | 64 | GET | /api/notificaciones/conteo-no-leidas | A |
 | 65 | PATCH | /api/notificaciones/{id}/leida | A |
@@ -594,6 +610,7 @@ Cola de verificación ordenada por `prioridad` (ALTA primero) y luego por `fecha
 | 73 | GET | /api/admin/reportes/{id} | AD |
 | 74 | POST | /api/admin/reportes/{id}/resolver | AD |
 | 75 | POST | /api/admin/sanciones/{id}/apelaciones/{a}/resolver | AD |
+| 75b | GET | /api/admin/sanciones | AD |
 | 76 | GET | /api/admin/mensajes-reportados | AD |
 | 76b | POST | /api/admin/mensajes-reportados/{id}/moderar | AD |
 | 76c | GET | /api/admin/resenas-reportadas | AD |

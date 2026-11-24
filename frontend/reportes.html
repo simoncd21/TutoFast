@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reportes · TutoFast</title>
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/estilos.css">
+  <script>
+    // Aplica el tema guardado antes de pintar para evitar parpadeos.
+    (function () {
+      var t = localStorage.getItem('tutofast_tema');
+      if (t !== 'light' && t !== 'dark') {
+        t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  <header class="navbar" data-encabezado></header>
+
+  <main class="seccion">
+    <div class="contenedor admin reportes">
+      <h1>Reportes y sanciones</h1>
+      <div id="aviso" class="alerta" role="status" hidden></div>
+      <p id="cargando" class="texto-suave">Cargando…</p>
+
+      <div id="contenido" hidden>
+        <section class="tarjeta" id="radicar" aria-labelledby="radicar-titulo">
+          <h2 id="radicar-titulo">Radicar un reporte</h2>
+          <p class="texto-suave">Si hubo un problema con un servicio (la otra persona no se presentó, te pidió pagar por fuera de la plataforma, un desacuerdo académico…), cuéntanoslo. Un reporte sobre un servicio en curso <strong>congela el pago</strong> y deja el servicio «En revisión» hasta que un administrador lo resuelva. Quien reportas será notificado.</p>
+          <form id="form-reporte" novalidate>
+            <div class="rejilla-form">
+              <div class="campo">
+                <label for="rep-servicio">Servicio</label>
+                <select id="rep-servicio" name="servicioId"></select>
+                <div class="campo__error" data-error-de="servicioId" hidden></div>
+              </div>
+              <div class="campo">
+                <label for="rep-tipo">Motivo del reporte</label>
+                <select id="rep-tipo" name="tipo" required></select>
+                <div class="campo__error" data-error-de="tipo" hidden></div>
+              </div>
+            </div>
+            <p id="rep-denunciado" class="texto-suave" hidden></p>
+            <div class="campo">
+              <label for="rep-motivo">Cuéntanos qué pasó</label>
+              <textarea id="rep-motivo" name="motivo" maxlength="1000" required></textarea>
+              <div class="campo__ayuda">Entre 10 y 1000 caracteres. Describe hechos concretos (fecha, hora, qué se acordó).</div>
+              <div class="campo__error" data-error-de="motivo" hidden></div>
+            </div>
+            <div id="rep-evidencias"></div>
+            <div class="campo__error" id="rep-evidencias-error" hidden></div>
+            <button class="btn btn--primario" type="submit">Radicar reporte</button>
+          </form>
+        </section>
+
+        <section class="tarjeta" id="mis-reportes" aria-labelledby="mis-reportes-titulo">
+          <div class="barra-acciones">
+            <h2 id="mis-reportes-titulo">Mis reportes</h2>
+            <button class="btn btn--borde btn--pequeno" type="button" id="reportes-recargar">Actualizar</button>
+          </div>
+          <h3>Radicados por mí</h3>
+          <div id="reportes-radicados" class="moderacion" aria-live="polite"></div>
+          <p id="radicados-vacio" class="texto-suave" hidden>Todavía no has radicado reportes.</p>
+          <h3>Recibidos</h3>
+          <p class="texto-suave">Reportes que otra persona radicó en tu contra. Por seguridad no se muestra quién los radicó.</p>
+          <div id="reportes-recibidos" class="moderacion" aria-live="polite"></div>
+          <p id="recibidos-vacio" class="texto-suave" hidden>No tienes reportes en tu contra.</p>
+        </section>
+
+        <section class="tarjeta" id="sanciones" aria-labelledby="sanciones-titulo">
+          <h2 id="sanciones-titulo">Mis sanciones</h2>
+          <p class="texto-suave">Puedes apelar una sanción vigente con tu descargo y evidencias. También puedes hacerlo desde <a href="perfil.html#sanciones">tu perfil</a>.</p>
+          <div id="lista-sanciones" class="moderacion" aria-live="polite"></div>
+          <p id="sanciones-vacio" class="texto-suave" hidden>No tienes sanciones.</p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="pie">
+    <div class="contenedor pie__interior">
+      <span>© <span id="anio"></span> TutoFast · Proyecto académico</span>
+      <span>Tutorías universitarias con precios negociables</span>
+    </div>
+  </footer>
+
+  <script type="module" src="js/paginas/reportes.js"></script>
+</body>
+</html>

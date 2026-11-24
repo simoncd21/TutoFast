@@ -30,7 +30,7 @@ import com.tutofast.repositorio.RepositorioSancion;
 import com.tutofast.repositorio.RepositorioUsuario;
 
 /**
- * Aplica y levanta sanciones. Lo usan la moderación de mensajes y de reseñas; el módulo de reportes lo reutilizará.
+ * Aplica, revoca y levanta sanciones. Lo usan la moderación de mensajes y de reseñas y {@link ServicioReportes}.
  *
  * <p>Una sanción siempre cuelga de un {@link Reporte}: cuando nace de la moderación se radica y resuelve un reporte
  * (a favor del reportante) para que la sanción tenga su expediente y pueda apelarse. Una suspensión temporal pone la
@@ -174,6 +174,68 @@ public class AplicadorSanciones {
             }
         }
         return cerradas;
+    }
+
+    /**
+     * Restablece la cuenta tras revocar una sanción (o al compensar una que no pudo completarse): si la cuenta estaba
+     * en el estado que esa sanción provocó (SUSPENDIDA o BLOQUEADA), pasa al que corresponda según las sanciones que
+     * sigan activas (BLOQUEADA si queda un bloqueo permanente, SUSPENDIDA si queda una suspensión, ACTIVA si no queda
+     * ninguna). Una cuenta que un administrador cambió a mano a otro estado no se toca. La advertencia no afecta la cuenta.
+     */
+    public void restablecerCuenta(Sancion revocada, Instant ahora) {
+        EstadoCuenta provocado = switch (revocada.getTipo()) {
+            case SUSPENSION_TEMPORAL -> EstadoCuenta.SUSPENDIDA;
+            case BLOQUEO_PERMANENTE -> EstadoCuenta.BLOQUEADA;
+            case ADVERTENCIA -> null;
+        };
+        Usuario usuario = provocado == null ? null : usuarios.findById(revocada.getUsuarioId()).orElse(null);
+        if (usuario == null || usuario.getEstadoCuenta() != provocado) {
+            return;
+        }
+        List<Sancion> restantes = sanciones.findByUsuarioIdAndEstadoIn(revocada.getUsuarioId(),
+                        List.of(EstadoSancion.VIGENTE, EstadoSancion.EN_APELACION, EstadoSancion.RATIFICADA))
+                .stream().filter(s -> !s.getId().equals(revocada.getId()) && s.suspendeCuenta(ahora)).toList();
+        EstadoCuenta nuevo = restantes.stream().anyMatch(s -> s.getTipo() == TipoSancion.BLOQUEO_PERMANENTE)
+                ? EstadoCuenta.BLOQUEADA
+                : restantes.isEmpty() ? EstadoCuenta.ACTIVA : EstadoCuenta.SUSPENDIDA;
+        if (nuevo != usuario.getEstadoCuenta()) {
+            EstadoCuenta previo = usuario.getEstadoCuenta();
+            usuario.setEstadoCuenta(nuevo);
+            try {
+                usuarios.save(usuario);
+            } catch (RuntimeException e) {
+                usuario.setEstadoCuenta(previo);
+                throw e;
+            }
+        }
+    }
+
+    /** Elimina una sanción recién aplicada y restablece la cuenta (compensación de una resolución que falló). */
+    public void descartar(Sancion sancion, Instant ahora) {
+        try {
+            sanciones.deleteById(sancion.getId());
+            restablecerCuenta(sancion, ahora);
+        } catch (RuntimeException e) {
+            log.warn("No se pudo compensar la sanción {}", sancion.getId(), e);
+        }
+    }
+
+    /**
+     * Cierra una suspensión ratificada cuya vigencia terminó mientras se resolvía la apelación (RATIFICADA → CUMPLIDA)
+     * y reactiva la cuenta si ninguna otra sanción la mantiene suspendida. Devuelve si la cerró.
+     */
+    public boolean cerrarSiVencida(Sancion sancion, Instant ahora) {
+        if (sancion.getEstado() != EstadoSancion.RATIFICADA || sancion.getVigencia() == null
+                || !sancion.getVigencia().haVencido(ahora)) {
+            return false;
+        }
+        sancion.cumplir(ahora);
+        sanciones.save(sancion);
+        reactivarSiCorresponde(sancion.getUsuarioId(), ahora);
+        auditoria.registrarAccion(null, "SANCION_CUMPLIDA", "sancion:" + sancion.getId(),
+                Map.of("usuarioId", sancion.getUsuarioId()));
+        avisar(sancion.getUsuarioId(), "Tu suspensión terminó", "Tu cuenta volvió a estar activa.");
+        return true;
     }
 
     private void reactivarSiCorresponde(String usuarioId, Instant ahora) {

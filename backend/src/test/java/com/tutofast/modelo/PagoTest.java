@@ -111,4 +111,33 @@ class PagoTest {
     void noRetieneMontosNoPositivos() {
         assertThatThrownBy(() -> Pago.retener("srv1", BigDecimal.ZERO, "SIM-1", AHORA)).isInstanceOf(ExcepcionNegocio.class);
     }
+
+    @Test
+    void descongelarDevuelveElPagoCongeladoARetenido() {
+        Pago pago = pagoRetenido("40000");
+        pago.congelar(AHORA);
+
+        pago.descongelar(AHORA.plusSeconds(60));
+
+        assertThat(pago.getEstado()).isEqualTo(EstadoPago.RETENIDO);
+        assertThat(pago.getHistorial()).hasSize(3);
+        // y puede volver a liquidarse con normalidad
+        pago.liberar(new BigDecimal("10"), AHORA);
+        assertThat(pago.getEstado()).isEqualTo(EstadoPago.LIBERADO);
+    }
+
+    @Test
+    void soloSeDescongelaUnPagoCongelado() {
+        Pago retenido = pagoRetenido("40000");
+        Pago liberado = pagoRetenido("40000");
+        liberado.liberar(new BigDecimal("10"), AHORA);
+        Pago reembolsado = pagoRetenido("40000");
+        reembolsado.congelar(AHORA);
+        reembolsado.reembolsar(AHORA);
+
+        for (Pago p : java.util.List.of(retenido, liberado, reembolsado)) {
+            assertThatThrownBy(() -> p.descongelar(AHORA))
+                    .isInstanceOfSatisfying(ExcepcionNegocio.class, e -> assertThat(e.getEstado()).isEqualTo(HttpStatus.CONFLICT));
+        }
+    }
 }

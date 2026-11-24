@@ -27,6 +27,11 @@
       <p id="cargando" class="texto-suave">Cargando tu perfil…</p>
 
       <div id="contenido" hidden>
+        <div id="aviso-cuenta" class="alerta alerta--advertencia" role="alert" hidden>
+          <strong id="aviso-cuenta-titulo"></strong>
+          <span id="aviso-cuenta-texto"></span>
+        </div>
+
         <section class="tarjeta" aria-labelledby="datos-titulo">
           <h2 id="datos-titulo">Datos de la cuenta</h2>
           <dl class="datos">
@@ -178,6 +183,13 @@
             <p id="soportes-vacio" class="texto-suave" hidden>Aún no has enviado soportes.</p>
           </section>
         </div>
+
+        <section class="tarjeta" id="sanciones" aria-labelledby="sanciones-titulo">
+          <h2 id="sanciones-titulo">Mis sanciones y apelaciones</h2>
+          <p class="texto-suave">Si un administrador te sancionó tras un reporte, aquí ves el motivo y la vigencia. Puedes apelar una sanción vigente con tu descargo y evidencias; mientras se resuelve, la sanción sigue vigente.</p>
+          <div id="lista-sanciones" class="moderacion" aria-live="polite"></div>
+          <p id="sanciones-vacio" class="texto-suave" hidden>No tienes sanciones. ¡Gracias por cuidar la comunidad!</p>
+        </section>
 
         <section class="tarjeta" id="notificaciones" aria-labelledby="notif-titulo">
           <div class="barra-acciones">

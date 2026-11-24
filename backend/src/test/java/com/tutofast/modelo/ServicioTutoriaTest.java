@@ -218,4 +218,25 @@ class ServicioTutoriaTest {
         assertThat(servicio.esParticipante("otro")).isFalse();
         assertThat(servicio.esParticipante(null)).isFalse();
     }
+
+    @Test
+    void reanudarDevuelveElServicioASuEstadoPrevioAlReporte() {
+        servicio.ponerEnRevision();
+        servicio.reanudar();
+        assertThat(servicio.getEstado()).isEqualTo(EstadoServicio.CONFIRMADO);
+
+        servicio.iniciarSesion(SESION);
+        servicio.ponerEnRevision();
+        servicio.reanudar();
+        assertThat(servicio.getEstado()).isEqualTo(EstadoServicio.EN_DESARROLLO);
+        assertThat(servicio.getFechaInicio()).isEqualTo(SESION);
+    }
+
+    @Test
+    void soloSeReanudaUnServicioEnRevision() {
+        assertConflicto(() -> servicio.reanudar(), "TRANSICION_INVALIDA");
+        servicio.iniciarSesion(SESION);
+        servicio.finalizar(SESION.plusSeconds(3600));
+        assertConflicto(() -> servicio.reanudar(), "TRANSICION_INVALIDA");
+    }
 }

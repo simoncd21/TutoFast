@@ -220,17 +220,27 @@ El módulo se entrega en dos partes: **(A) propuestas y negociación**, hecha en
 - Orden de la finalización: validar → servicio FINALIZADO → pago LIBERADO (si falla, se restaura el servicio) → recálculo → auditoría → avisos.
 - Las sanciones temporales se levantan con la tarea horaria (`AplicadorSanciones.levantarVencidas`); una suspensión en apelación no se levanta sola.
 
-## Módulo 10 · `feature/10-reportes-sanciones-despliegue`
+## Módulo 10 · `feature/10-reportes-sanciones-apelaciones` (el cierre de despliegue pasa a un módulo 11)
 **Depende de:** 08, 09
-- [ ] `servicio/ServicioReportes` (`radicarReporte` → EN_REVISION + CONGELADO, `presentarDescargo` → Apelación, `resolverReporte` → reembolsar o liberar, `aplicarSancion`, `resolverApelacion`).
-- [ ] Controladores: ReporteControlador; reportes y apelaciones en AdministracionControlador.
-- [ ] Endpoints: `POST /api/reportes`, `GET /api/reportes/mios`, `GET /api/sanciones/mias`, `POST /api/sanciones/{id}/apelaciones`, `GET /api/admin/reportes`, `GET /api/admin/reportes/{id}`, `POST /api/admin/reportes/{id}/resolver`, `POST /api/admin/sanciones/{id}/apelaciones/{a}/resolver`.
-- [ ] Frontend: `reportes.html` (radicar, mis reportes, mis sanciones, apelar); pestaña Reportes en `admin.html` (expediente con historial del chat, resolución, sanción).
-- [ ] Cierre: `render.yaml`, README con despliegue, `diseno-api.md` final, revisión de "UniDrive".
+- [x] `servicio/ServicioReportes` (`radicarReporte` → EN_REVISION + pago CONGELADO, `listarMios`, `listarSancionesMias`, `apelarSancion` → Apelación, `listarReportes`, `consultarExpediente`, `resolverReporte` → reembolsar, liberar o reanudar + sanción opcional, `listarSanciones`, `resolverApelacion`), `ContextoReportes` (acceso a las evidencias) y ampliación de `AplicadorSanciones` (`restablecerCuenta`, `descartar`, `cerrarSiVencida`).
+- [x] Modelo: `Pago.descongelar`, `ServicioTutoria.reanudar`, `Apelacion`/`Sancion` con observación y administrador de la resolución. `ServicioPagos.descongelarPago`.
+- [x] Seguridad: las cuentas SUSPENDIDA/BLOQUEADA inician **sesión restringida** (solo `/api/auth/yo`, sanciones, notificaciones y descarga de archivos) para poder apelar; el resto sigue en 403. El manejador global responde 400 si falta una parte multipart.
+- [x] Controladores: `ReporteControlador`; reportes, sanciones y apelaciones en `AdministracionControlador` (sin lógica de negocio).
+- [x] Endpoints: `POST /api/reportes`, `GET /api/reportes/mios`, `GET /api/sanciones/mias`, `POST /api/sanciones/{id}/apelaciones`, `GET /api/admin/reportes`, `GET /api/admin/reportes/{id}`, `POST /api/admin/reportes/{id}/resolver`, `GET /api/admin/sanciones`, `POST /api/admin/sanciones/{id}/apelaciones/{a}/resolver`.
+- [x] Frontend: `reportes.html` (radicar con evidencias, mis reportes radicados/recibidos, mis sanciones y apelar); sección «Mis sanciones y apelaciones» en `perfil.html` (con modo de cuenta restringida); pestaña «Reportes y sanciones» en `admin.html` (cola, expediente con servicio, pago, evidencias e historial del chat, resolución con sanción, cola de apelaciones); enlace «Reportar un problema» en el detalle del servicio. Componentes `evidencias.js` y `sanciones.js`.
+- [ ] Cierre de despliegue (pendiente, módulo 11): `render.yaml`, README con despliegue, `diseno-api.md` final, revisión de «UniDrive» en `docs/`.
 
 **Pruebas**
-- [ ] `ServicioReportesTest`: radicar congela el pago y bloquea la finalización; REEMBOLSAR → REEMBOLSADO + CANCELADO; sanción temporal suspende la cuenta; apelación revocada la reactiva; segunda apelación pendiente → 409.
+- [x] `ServicioReportesTest` (63): radicar congela el pago y bloquea la finalización y el cierre automático; REEMBOLSAR → REEMBOLSADO + CANCELADO; LIBERAR → LIBERADO + FINALIZADO; desestimar reanuda; otro reporte abierto mantiene el congelamiento; sanción temporal suspende la cuenta; apelación revocada la reactiva (también con otras sanciones activas); segunda apelación pendiente → 409; permisos (403), duplicados, validaciones, compensaciones y el recorrido completo de HU-10.
+- [x] `ReportesControladorTest` (15): HTTP con filtro JWT y roles, multipart, sesión restringida del sancionado, descarga de evidencias por contexto.
+- [x] `AplicadorSancionesTest` (restablecer, descartar, cerrar vencidas), `PagoTest`, `ServicioTutoriaTest`, `PropuestaYSancionTest`, `ContextoReportesTest`; `ServicioIdentidadTest` y `AutenticacionControladorTest` actualizados a la sesión restringida.
+- [x] Interfaz verificada en Edge headless contra una API simulada (reportes, perfil de cuenta suspendida y panel de administración) en tema claro y oscuro.
 - [ ] Recorrido E2E completo en Render (ver la guía de infraestructura).
+
+**Notas de diseño**
+- El denunciado ve el reporte en su contra sin la identidad del reportante ni sus evidencias.
+- No hay plazo para apelar: los documentos no lo definen (HU-10 habla de «dentro del plazo establecido»); queda como decisión abierta.
+- La resolución a favor del denunciado con acción NINGUNA reanuda el servicio; no hay sanción al reportante por reportes infundados.
 
 ---
 

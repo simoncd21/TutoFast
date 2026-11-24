@@ -149,20 +149,22 @@ public class ServicioIdentidad {
             }
             throw new ExcepcionNoAutenticado(MENSAJE_CREDENCIALES);
         }
-        exigirCuentaActiva(usuario);
+        // Una cuenta suspendida o bloqueada entra con sesión restringida: solo puede consultar y apelar sus sanciones.
         JwtUtil.TokenEmitido emitido = jwtUtil.generar(usuario.getId(), usuario.getCorreo());
         auditoria.registrarAccion(usuario.getId(), "INICIO_SESION", ENTIDAD_USUARIO, null);
         return new SesionDTO(emitido.token(), emitido.expiraEn(), UsuarioMapper.aUsuarioDTO(usuario));
     }
 
-    /** Usado por el filtro JWT: valida el token y carga el usuario vigente desde la base de datos. */
+    /**
+     * Usado por el filtro JWT: valida el token y carga el usuario vigente desde la base de datos. Una cuenta
+     * SUSPENDIDA o BLOQUEADA se devuelve con {@code restringida=true}; el filtro limita sus rutas.
+     */
     public UsuarioAutenticado autenticarToken(String token) {
         String id = jwtUtil.extraerUsuarioId(token);
         Usuario usuario = repositorio.findById(id)
                 .orElseThrow(() -> new ExcepcionNoAutenticado("Token inválido o expirado"));
-        exigirCuentaActiva(usuario);
         return new UsuarioAutenticado(usuario.getId(), usuario.getCorreo(), usuario.getNombre(),
-                new LinkedHashSet<>(usuario.getRoles()));
+                new LinkedHashSet<>(usuario.getRoles()), !usuario.estaActiva());
     }
 
     public UsuarioDTO obtenerUsuario(String usuarioId) {
@@ -447,13 +449,6 @@ public class ServicioIdentidad {
     private static void exigirRol(Usuario usuario, Rol rol) {
         if (!usuario.tieneRol(rol)) {
             throw new ExcepcionAutorizacion("Necesita el rol " + rol + " para realizar esta acción");
-        }
-    }
-
-    private static void exigirCuentaActiva(Usuario usuario) {
-        if (!usuario.estaActiva()) {
-            throw new ExcepcionAutorizacion("Su cuenta está " + usuario.getEstadoCuenta().name().toLowerCase(Locale.ROOT)
-                    + " y no puede acceder a la plataforma");
         }
     }
 

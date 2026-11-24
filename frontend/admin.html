@@ -33,6 +33,7 @@
           <button class="pestana" type="button" role="tab" id="pestana-verificacion" aria-controls="panel-verificacion" aria-selected="false" tabindex="-1">Verificación de tutores</button>
           <button class="pestana" type="button" role="tab" id="pestana-usuarios" aria-controls="panel-usuarios" aria-selected="false" tabindex="-1">Usuarios</button>
           <button class="pestana" type="button" role="tab" id="pestana-moderacion" aria-controls="panel-moderacion" aria-selected="false" tabindex="-1">Moderación</button>
+          <button class="pestana" type="button" role="tab" id="pestana-reportes" aria-controls="panel-reportes" aria-selected="false" tabindex="-1">Reportes y sanciones</button>
           <button class="pestana" type="button" role="tab" id="pestana-cierre" aria-controls="panel-cierre" aria-selected="false" tabindex="-1">Cierre automático</button>
           <button class="pestana" type="button" role="tab" id="pestana-auditoria" aria-controls="panel-auditoria" aria-selected="false" tabindex="-1">Auditoría</button>
         </div>
@@ -209,6 +210,60 @@
             <p class="texto-suave">Si confirmas la infracción la reseña se oculta de forma definitiva y deja de contar en la reputación. También puedes sancionar a su autor.</p>
             <div id="resenas-reportadas" class="moderacion" aria-live="polite"></div>
             <p id="resenas-vacio" class="texto-suave" hidden>No hay reseñas reportadas pendientes de revisión.</p>
+          </div>
+        </section>
+
+        <!-- Reportes, sanciones y apelaciones -->
+        <section id="panel-reportes" class="admin__panel" role="tabpanel" aria-labelledby="pestana-reportes" hidden>
+          <div class="tarjeta">
+            <div class="barra-acciones">
+              <h2>Reportes</h2>
+              <button class="btn btn--borde btn--pequeno" type="button" id="reportes-admin-recargar">Actualizar</button>
+            </div>
+            <p class="texto-suave">Abre el expediente de un reporte para revisar el servicio, el pago, las evidencias y el historial íntegro del chat. Al resolver puedes reembolsar al estudiante, liberar el pago al tutor o no mover dinero, y sancionar a la persona reportada si la decisión es a favor de quien reportó.</p>
+            <div class="admin__barra">
+              <div class="campo">
+                <label for="rep-admin-estado">Estado</label>
+                <select id="rep-admin-estado">
+                  <option value="EN_REVISION" selected>En revisión</option>
+                  <option value="RADICADO">Radicados</option>
+                  <option value="RESUELTO">Resueltos</option>
+                  <option value="DESESTIMADO">Desestimados</option>
+                  <option value="">Todos</option>
+                </select>
+              </div>
+            </div>
+            <div id="reportes-admin" class="moderacion" aria-live="polite"></div>
+            <p id="reportes-admin-vacio" class="texto-suave" hidden>No hay reportes con ese estado.</p>
+            <div class="paginacion">
+              <button class="btn btn--borde btn--pequeno" type="button" id="reportes-admin-anterior">Anterior</button>
+              <span id="reportes-admin-pagina" class="texto-suave"></span>
+              <button class="btn btn--borde btn--pequeno" type="button" id="reportes-admin-siguiente">Siguiente</button>
+            </div>
+          </div>
+          <div class="tarjeta">
+            <h2>Sanciones y apelaciones</h2>
+            <p class="texto-suave">Una apelación pendiente mantiene la sanción vigente hasta que la resuelvas. Al revocarla se restablece la cuenta de la persona sancionada.</p>
+            <div class="admin__barra">
+              <div class="campo">
+                <label for="san-admin-estado">Estado de la sanción</label>
+                <select id="san-admin-estado">
+                  <option value="EN_APELACION" selected>En apelación</option>
+                  <option value="VIGENTE">Vigentes</option>
+                  <option value="RATIFICADA">Ratificadas</option>
+                  <option value="REVOCADA">Revocadas</option>
+                  <option value="CUMPLIDA">Cumplidas</option>
+                  <option value="">Todas</option>
+                </select>
+              </div>
+            </div>
+            <div id="sanciones-admin" class="moderacion" aria-live="polite"></div>
+            <p id="sanciones-admin-vacio" class="texto-suave" hidden>No hay sanciones con ese estado.</p>
+            <div class="paginacion">
+              <button class="btn btn--borde btn--pequeno" type="button" id="sanciones-admin-anterior">Anterior</button>
+              <span id="sanciones-admin-pagina" class="texto-suave"></span>
+              <button class="btn btn--borde btn--pequeno" type="button" id="sanciones-admin-siguiente">Siguiente</button>
+            </div>
           </div>
         </section>
 

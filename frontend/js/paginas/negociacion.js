@@ -201,6 +201,11 @@ function pintarAcciones(s, papel, recargar) {
   if (papel && s.estado === 'EN_REVISION') {
     nodos.push(el('p', 'texto-suave', 'El servicio está en revisión por un reporte: el pago permanece congelado hasta que un administrador lo resuelva.'));
   }
+  if (papel && s.estado !== 'CANCELADO') {
+    const reportar = el('a', 'btn btn--borde btn--pequeno', 'Reportar un problema con este servicio');
+    reportar.href = `reportes.html?servicioId=${encodeURIComponent(s.id)}`;
+    nodos.push(reportar);
+  }
   seccion.hidden = nodos.length === 0;
   seccion.replaceChildren(...nodos);
 }

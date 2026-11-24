@@ -103,6 +103,14 @@ public class Pago {
         registrar(EstadoPago.CONGELADO, ahora);
     }
 
+    /** CONGELADO → RETENIDO: el reporte se desestimó o se compensa un fallo; los fondos vuelven a la custodia normal. */
+    public void descongelar(Instant ahora) {
+        if (estado != EstadoPago.CONGELADO) {
+            throw ExcepcionNegocio.transicionInvalida("el pago", estado, EstadoPago.RETENIDO);
+        }
+        registrar(EstadoPago.RETENIDO, ahora);
+    }
+
     /** CONGELADO → REEMBOLSADO: el estudiante recupera el monto completo, sin comisión. */
     public void reembolsar(Instant ahora) {
         if (estado != EstadoPago.CONGELADO) {

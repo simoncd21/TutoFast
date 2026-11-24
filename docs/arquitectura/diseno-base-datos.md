@@ -396,12 +396,17 @@ Herencia en una sola colección. Cada subclase lleva `@TypeAlias("AL_TUTOR")` / 
     "evidencias": [{ "$oid": "6741a0c1e4b0a1b2c3d4e905" }],
     "resultado": "PENDIENTE",
     "fechaPresentacion": { "$date": "2026-12-08T10:00:00Z" },
-    "fechaResolucion": null
+    "fechaResolucion": null,
+    "observacionResolucion": null,
+    "resueltaPor": null
   }]
 }
 ```
 - `tipo`: ADVERTENCIA · SUSPENSION_TEMPORAL · BLOQUEO_PERMANENTE. `estado`: VIGENTE · EN_APELACION · RATIFICADA · REVOCADA · CUMPLIDA. `Apelacion.resultado`: PENDIENTE · RATIFICADA · REVOCADA.
+- `Apelacion.observacionResolucion` y `resueltaPor` (administrador) se completan al resolver; una sanción acepta una sola apelación pendiente y solo se apela en estado VIGENTE.
 - Índices: `{usuarioId: 1, estado: 1}`, `{reporteId: 1}`, `{"apelaciones.resultado": 1}`.
+- Estados de cuenta: una suspensión o bloqueo cambia `usuarios.estadoCuenta`; al revocar la sanción se recalcula según las sanciones que sigan activas (BLOQUEADA si queda un bloqueo, SUSPENDIDA si queda una suspensión, ACTIVA si ninguna). La cuenta SUSPENDIDA/BLOQUEADA conserva una sesión restringida para apelar.
+- Reglas del reporte: nace `EN_REVISION`; un reportante no tiene dos reportes abiertos con el mismo denunciado y servicio (consulta por `reportanteId` + `denunciadoId` + `servicioId` + `estado`); las evidencias (`evidencias`) y las de las apelaciones (`apelaciones.evidencias`) se localizan por valor del arreglo para controlar el acceso y la limpieza de archivos huérfanos.
 
 ---
 
@@ -468,7 +473,9 @@ Herencia en una sola colección. Cada subclase lleva `@TypeAlias("AL_TUTOR")` / 
 | `finalizarServicio` / `cerrarAutomaticamente` | servicio, pago, perfil del tutor | sí (una por servicio; con el gestor no-op se compensa a mano) |
 | `moderarMensaje` / `moderarResena` | mensaje o reseña, reporte, sanción, usuario | sí |
 | `radicarReporte` | reporte, servicio, pago | sí (las evidencias se suben antes, fuera de la transacción) |
-| `resolverReporte` | reporte, pago, sanción, usuario | sí |
+| `resolverReporte` | reporte, pago, servicio, sanción, usuario | sí (con compensación manual si el gestor es no-op) |
+| `apelarSancion` | sanción | una sola escritura (las evidencias se suben antes) |
+| `resolverApelacion` | sanción, usuario | sí (con compensación manual si el gestor es no-op) |
 | Subidas y descargas GridFS | archivos.* | **nunca** dentro de `@Transactional` |
 
 Con `MONGO_TRANSACCIONES=false` (Mongo local sin replica set) las operaciones se ejecutan sin atomicidad multi-documento; esto solo es aceptable en desarrollo.
